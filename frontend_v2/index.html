@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roomiva — Compatibilidad en pisos compartidos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #FAFAF8;
+  --surface: #FFFFFF;
+  --surface-2: #F4F3EF;
+  --text: #111110;
+  --text-2: #6B6A65;
+  --text-3: #9E9D98;
+  --accent: #1A3A2A;
+  --accent-mid: #2D6147;
+  --accent-light: #EBF2ED;
+  --border: #E8E6E0;
+  --border-2: #D4D1C8;
+  --radius: 10px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow: 0 2px 8px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04);
+}
+
+html { font-size: 16px; scroll-behavior: smooth; }
+body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+
+/* ── PAGES ── */
+.page { display: none; min-height: 100vh; }
+.page.active { display: block; }
+
+/* ── BUTTONS ── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px 20px; border-radius: 8px; font-family: 'Outfit', sans-serif;
+  font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: all 0.18s;
+  border: none; text-decoration: none; letter-spacing: 0.01em;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-mid); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(26,58,42,0.25); }
+.btn-ghost { background: transparent; color: var(--text-2); }
+.btn-ghost:hover { color: var(--text); background: var(--surface-2); }
+.btn-outline { background: white; color: var(--text); border: 1px solid var(--border-2); }
+.btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+.btn-lg { padding: 12px 28px; font-size: 0.95rem; border-radius: 9px; }
+.btn-full { width: 100%; }
+
+/* ── LOGO MARK ── */
+.logomark {
+  display: inline-flex; align-items: center; gap: 10px;
+  text-decoration: none; color: var(--text);
+}
+.logomark-icon {
+  width: 28px; height: 28px;
+  background: var(--accent); border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.logomark-icon svg { width: 14px; height: 14px; }
+.logomark-text { font-family: 'Cormorant Garamond', serif; font-size: 1.35rem; font-weight: 600; letter-spacing: -0.02em; }
+.logomark-text span { color: var(--accent-mid); }
+
+/* ── NAV ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  height: 60px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 48px;
+  background: rgba(250,250,248,0.9); backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+}
+.nav-actions { display: flex; gap: 8px; align-items: center; }
+
+/* ══════════════════════════════════════════════
+   LANDING
+══════════════════════════════════════════════ */
+#page-landing { background: var(--bg); padding-top: 60px; }
+
+.hero {
+  max-width: 1080px; margin: 0 auto;
+  padding: 80px 48px 72px;
+  display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 80px; align-items: start;
+}
+
+.hero-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 0.75rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--accent-mid); margin-bottom: 22px;
+}
+.hero-eyebrow::before { content: ''; width: 20px; height: 1px; background: var(--accent-mid); }
+
+.hero h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 3.6rem; line-height: 1.08; letter-spacing: -0.03em; font-weight: 500;
+  margin-bottom: 22px; color: var(--text);
+}
+.hero h1 em { font-style: italic; color: var(--accent-mid); }
+.hero-desc { color: var(--text-2); line-height: 1.75; font-size: 1rem; margin-bottom: 40px; font-weight: 300; max-width: 420px; }
+
+.hero-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 56px; }
+
+.hero-stats { display: flex; gap: 36px; padding-top: 32px; border-top: 1px solid var(--border); }
+.stat { }
+.stat-n { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 600; line-height: 1; }
+.stat-l { font-size: 0.78rem; color: var(--text-3); margin-top: 3px; letter-spacing: 0.02em; }
+
+/* Role cards */
+.role-section { padding-top: 8px; }
+.role-label { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); margin-bottom: 14px; }
+.role-cards { display: flex; flex-direction: column; gap: 10px; }
+.role-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 20px 22px; cursor: pointer; transition: all 0.2s; text-align: left;
+  display: flex; align-items: center; gap: 16px;
+}
+.role-card:hover { border-color: var(--accent); background: var(--accent-light); transform: translateX(3px); }
+.role-card-icon {
+  width: 36px; height: 36px; border-radius: 8px; background: var(--surface-2);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.role-card-icon svg { width: 16px; height: 16px; color: var(--accent); }
+.role-card-text h3 { font-size: 0.9rem; font-weight: 500; margin-bottom: 3px; }
+.role-card-text p { font-size: 0.8rem; color: var(--text-2); line-height: 1.4; }
+.role-card-arrow { margin-left: auto; color: var(--text-3); transition: transform 0.2s; font-size: 0.9rem; }
+.role-card:hover .role-card-arrow { transform: translateX(3px); color: var(--accent); }
+
+/* ══════════════════════════════════════════════
+   AUTH
+══════════════════════════════════════════════ */
+#page-auth { padding-top: 60px; background: var(--bg); }
+.auth-wrap { max-width: 440px; margin: 0 auto; padding: 52px 24px; }
+.auth-back { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-2); cursor: pointer; background: none; border: none; font-family: inherit; margin-bottom: 36px; transition: color 0.15s; }
+.auth-back:hover { color: var(--text); }
+
+.auth-card { background: white; border: 1px solid var(--border); border-radius: 14px; padding: 36px; box-shadow: var(--shadow-lg); }
+.auth-card-header { margin-bottom: 28px; }
+.auth-card-header h2 { font-family: 'Cormorant Garamond', serif; font-size: 1.75rem; font-weight: 500; margin-bottom: 5px; }
+.auth-card-header p { font-size: 0.85rem; color: var(--text-2); }
+
+.auth-tabs { display: flex; background: var(--surface-2); border-radius: 8px; padding: 3px; margin-bottom: 24px; }
+.auth-tab { flex: 1; padding: 7px; text-align: center; border-radius: 6px; font-size: 0.82rem; font-weight: 500; cursor: pointer; border: none; background: none; font-family: inherit; color: var(--text-2); transition: all 0.15s; }
+.auth-tab.active { background: white; color: var(--text); box-shadow: var(--shadow-sm); }
+
+/* ── FORM ELEMENTS ── */
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 0.8rem; font-weight: 500; margin-bottom: 6px; color: var(--text); letter-spacing: 0.01em; }
+.form-group input, .form-group select, .form-group textarea {
+  width: 100%; padding: 9px 13px; border: 1.5px solid var(--border);
+  border-radius: 8px; font-family: 'Outfit', sans-serif; font-size: 0.875rem;
+  background: white; color: var(--text); transition: border-color 0.15s, box-shadow 0.15s; outline: none;
+  -webkit-appearance: none;
+}
+.form-group input:focus, .form-group select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(26,58,42,0.08); }
+.form-group input::placeholder { color: var(--text-3); }
+.form-group .hint { font-size: 0.75rem; color: var(--text-3); margin-top: 4px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.alert { padding: 10px 14px; border-radius: 8px; font-size: 0.82rem; margin-bottom: 14px; }
+.alert-error { background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; }
+.alert-success { background: #F0FDF4; border: 1px solid #BBF7D0; color: #15803D; }
+
+/* ── ROLE TOGGLE ── */
+.role-toggle { display: flex; gap: 8px; }
+.role-toggle-btn {
+  flex: 1; padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 8px;
+  font-size: 0.82rem; font-weight: 500; cursor: pointer; text-align: center;
+  transition: all 0.15s; background: white; color: var(--text-2); font-family: inherit;
+}
+.role-toggle-btn.active { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
+
+/* ══════════════════════════════════════════════
+   SETUP
+══════════════════════════════════════════════ */
+#page-setup-candidato, #page-setup-propietario { padding-top: 60px; background: var(--bg); }
+.setup-wrap { max-width: 620px; margin: 0 auto; padding: 52px 24px 80px; }
+.setup-header { margin-bottom: 36px; }
+.setup-step { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); margin-bottom: 10px; }
+.setup-header h2 { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 500; margin-bottom: 6px; }
+.setup-header p { font-size: 0.875rem; color: var(--text-2); line-height: 1.6; }
+.setup-card { background: white; border: 1px solid var(--border); border-radius: 14px; padding: 32px; box-shadow: var(--shadow); }
+
+.section-label { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.section-gap { margin-top: 28px; }
+
+/* Chips */
+.chip-group { display: flex; flex-wrap: wrap; gap: 7px; }
+.chip {
+  padding: 7px 14px; border: 1.5px solid var(--border); border-radius: 6px;
+  font-size: 0.8rem; font-weight: 500; cursor: pointer; transition: all 0.15s;
+  background: white; color: var(--text-2); font-family: inherit; letter-spacing: 0.01em;
+}
+.chip:hover { border-color: var(--border-2); color: var(--text); }
+.chip.selected { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
+
+/* Barrios grid */
+.barrios-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; max-height: 220px; overflow-y: auto; padding: 2px; }
+.barrios-grid::-webkit-scrollbar { width: 4px; }
+.barrios-grid::-webkit-scrollbar-track { background: var(--surface-2); border-radius: 2px; }
+.barrios-grid::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 2px; }
+.barrio-chip {
+  padding: 7px 8px; border: 1.5px solid var(--border); border-radius: 6px;
+  font-size: 0.75rem; font-weight: 500; cursor: pointer; text-align: center;
+  transition: all 0.15s; background: white; color: var(--text-2); font-family: inherit;
+}
+.barrio-chip.selected { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
+
+/* Duration badge */
+.duration-badge {
+  display: none; margin-top: 8px; padding: 8px 12px;
+  background: var(--accent-light); border: 1px solid rgba(26,58,42,0.15);
+  border-radius: 6px; font-size: 0.78rem; color: var(--accent); font-weight: 500;
+}
+.duration-badge.visible { display: block; }
+
+/* Yes/No toggle */
+.yn-group { display: flex; gap: 8px; }
+.yn-btn {
+  flex: 1; padding: 8px; border: 1.5px solid var(--border); border-radius: 7px;
+  font-size: 0.82rem; font-weight: 500; cursor: pointer; text-align: center;
+  transition: all 0.15s; background: white; color: var(--text-2); font-family: inherit;
+}
+.yn-btn.selected { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
+
+/* ══════════════════════════════════════════════
+   DASHBOARD
+══════════════════════════════════════════════ */
+#page-dash-candidato, #page-dash-propietario { background: var(--bg); }
+
+.dash-nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100; height: 60px;
+  background: rgba(250,250,248,0.95); backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 40px;
+}
+.dash-user-info { display: flex; align-items: center; gap: 10px; }
+.dash-avatar {
+  width: 30px; height: 30px; background: var(--accent); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.02em;
+}
+.dash-username { font-size: 0.85rem; font-weight: 500; }
+
+/* Dash tabs */
+.dash-tabs {
+  display: flex; gap: 2px; background: var(--surface-2);
+  border-radius: 8px; padding: 3px;
+}
+.dash-tab {
+  padding: 6px 16px; border-radius: 6px; font-size: 0.8rem; font-weight: 500;
+  cursor: pointer; border: none; font-family: inherit; background: none;
+  color: var(--text-2); transition: all 0.15s; white-space: nowrap;
+}
+.dash-tab.active { background: white; color: var(--text); box-shadow: var(--shadow-sm); }
+
+.dash-body { padding: 76px 40px 60px; max-width: 1060px; margin: 0 auto; }
+
+/* Dash panels */
+.dash-panel { display: none; }
+.dash-panel.active { display: block; }
+
+.dash-panel-header { margin-bottom: 28px; }
+.dash-panel-header h2 { font-family: 'Cormorant Garamond', serif; font-size: 1.6rem; font-weight: 500; margin-bottom: 4px; }
+.dash-panel-header p { font-size: 0.85rem; color: var(--text-2); }
+
+.dash-grid { display: grid; grid-template-columns: 260px 1fr; gap: 24px; }
+
+/* Profile sidebar */
+.profile-sidebar { }
+.profile-card { background: white; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.profile-card-header { padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.profile-card-header h3 { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); }
+.profile-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; border-bottom: 1px solid var(--border); font-size: 0.82rem; }
+.profile-row:last-child { border-bottom: none; }
+.profile-row-label { color: var(--text-2); }
+.profile-row-val { font-weight: 500; text-align: right; max-width: 55%; }
+.badge { padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.02em; }
+.badge-green { background: var(--accent-light); color: var(--accent); }
+.badge-amber { background: #FEF3C7; color: #92400E; }
+
+/* Results */
+.results-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.results-toolbar h3 { font-size: 0.95rem; font-weight: 600; }
+.results-count { font-size: 0.78rem; color: var(--text-3); background: var(--surface-2); padding: 3px 10px; border-radius: 20px; }
+
+.result-card {
+  background: white; border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 20px 22px; margin-bottom: 10px; cursor: pointer; transition: all 0.18s;
+}
+.result-card:hover { border-color: var(--border-2); box-shadow: var(--shadow); transform: translateY(-1px); }
+.result-card.open { border-color: var(--accent); }
+
+.rc-main { display: flex; align-items: flex-start; gap: 16px; }
+.rc-content { flex: 1; }
+.rc-title { font-size: 0.9rem; font-weight: 600; margin-bottom: 3px; }
+.rc-sub { font-size: 0.78rem; color: var(--text-2); margin-bottom: 12px; }
+
+.rc-bars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.rc-bar-item { }
+.rc-bar-label { font-size: 0.68rem; font-weight: 500; color: var(--text-3); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+.rc-bar-track { height: 3px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
+.rc-bar-fill { height: 100%; border-radius: 2px; }
+
+.score-badge {
+  flex-shrink: 0; width: 52px; height: 52px; border-radius: 50%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border: 2px solid;
+}
+.score-badge .sb-n { font-size: 1rem; font-weight: 600; line-height: 1; }
+.score-badge .sb-l { font-size: 0.5rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 1px; }
+.sb-high { border-color: #16A34A; color: #16A34A; }
+.sb-mid  { border-color: #D97706; color: #D97706; }
+.sb-low  { border-color: #DC2626; color: #DC2626; }
+
+.rc-detail { display: none; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.rc-detail.open { display: block; }
+.rc-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.rc-info-pills { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0; }
+.info-pill { padding: 3px 9px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; font-size: 0.75rem; color: var(--text-2); font-weight: 500; }
+.info-pill-green { background: #DCFCE7; border-color: #BBF7D0; color: #166534; }
+.info-pill-amber { background: #FEF3C7; border-color: #FDE68A; color: #92400E; }
+.rc-desc { font-size: 0.8rem; color: var(--text-2); line-height: 1.5; margin: 6px 0; font-style: italic; }
+.rc-feedback { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.feedback-btn { padding: 5px 14px; border-radius: 6px; font-size: 0.78rem; font-weight: 500; cursor: pointer; font-family: inherit; border: 1.5px solid; transition: all 0.15s; }
+.feedback-yes { border-color: #16A34A; color: #16A34A; background: white; }
+.feedback-yes:hover, .feedback-yes.active { background: #DCFCE7; }
+.feedback-no { border-color: var(--border-2); color: var(--text-2); background: white; }
+.feedback-no:hover, .feedback-no.active { background: var(--surface-2); }
+.feedback-btn.sent { opacity: 0.6; cursor: default; }
+.tag { padding: 3px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 500; }
+.tag-pos  { background: #DCFCE7; color: #166534; }
+.tag-warn { background: #FEF3C7; color: #92400E; }
+.tag-neg  { background: #FEE2E2; color: #991B1B; }
+
+/* Settings panel */
+.settings-wrap { max-width: 560px; }
+.settings-section { background: white; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 16px; }
+.settings-section-header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.settings-section-header h3 { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-2); }
+.settings-row { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.settings-row:last-child { border-bottom: none; }
+.settings-row-info { }
+.settings-row-label { font-size: 0.85rem; font-weight: 500; margin-bottom: 2px; }
+.settings-row-sub { font-size: 0.78rem; color: var(--text-2); }
+.settings-row-control { flex-shrink: 0; margin-left: 20px; }
+.settings-row-control input, .settings-row-control select {
+  padding: 6px 10px; border: 1.5px solid var(--border); border-radius: 6px;
+  font-family: 'Outfit', sans-serif; font-size: 0.82rem; background: white; color: var(--text);
+  outline: none; width: 140px; transition: border-color 0.15s;
+}
+.settings-row-control input:focus, .settings-row-control select:focus { border-color: var(--accent); }
+.settings-save-bar { padding: 20px 0 0; display: flex; justify-content: flex-end; gap: 10px; }
+
+/* Loading */
+.loading { text-align: center; padding: 60px 20px; }
+.spinner { width: 28px; height: 28px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 14px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading p { font-size: 0.85rem; color: var(--text-3); }
+
+/* Empty */
+.empty { text-align: center; padding: 72px 20px; }
+.empty h3 { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 500; margin-bottom: 8px; }
+.empty p { font-size: 0.85rem; color: var(--text-2); }
+
+@media (max-width: 768px) {
+  nav, .dash-nav { padding: 0 20px; }
+  .hero { grid-template-columns: 1fr; padding: 48px 20px 60px; gap: 40px; }
+  .hero h1 { font-size: 2.4rem; }
+  .dash-body { padding: 72px 20px 48px; }
+  .dash-grid { grid-template-columns: 1fr; }
+  .form-row { grid-template-columns: 1fr; }
+  .barrios-grid { grid-template-columns: repeat(2, 1fr); }
+  .rc-bars { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ LANDING ═══════════════ -->
+<div id="page-landing" class="page active">
+  <nav>
+    <a class="logomark" href="#">
+      <div class="logomark-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      </div>
+      <span class="logomark-text">Roomi<span>va</span></span>
+    </a>
+    <div class="nav-actions">
+      <button class="btn btn-ghost" onclick="showAuth('candidato','login')">Acceder</button>
+      <button class="btn btn-primary" onclick="showAuth('candidato','register')">Comenzar</button>
+    </div>
+  </nav>
+
+  <div class="hero">
+    <div>
+      <div class="hero-eyebrow">Barcelona · Sistema de compatibilidad</div>
+      <h1>Encuentra tu <em>hogar</em>,<br>no solo una habitación</h1>
+      <p class="hero-desc">Roomiva analiza tu estilo de vida, preferencias y necesidades para conectarte con el hogar y las personas con las que realmente encajas.</p>
+      <div class="hero-actions">
+        <button class="btn btn-primary btn-lg" onclick="showAuth('candidato','register')">Busco habitación</button>
+        <button class="btn btn-outline btn-lg" onclick="showAuth('propietario','register')">Tengo un piso</button>
+      </div>
+      <div class="hero-stats">
+        <div class="stat"><div class="stat-n">20</div><div class="stat-l">Barrios</div></div>
+        <div class="stat"><div class="stat-n">6</div><div class="stat-l">Criterios</div></div>
+        <div class="stat"><div class="stat-n">2</div><div class="stat-l">Roles</div></div>
+      </div>
+    </div>
+    <div class="role-section">
+      <div class="role-label">¿Cómo usarás Roomiva?</div>
+      <div class="role-cards">
+        <div class="role-card" onclick="showAuth('candidato','register')">
+          <div class="role-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </div>
+          <div class="role-card-text">
+            <h3>Busco habitación</h3>
+            <p>Recibe recomendaciones de hogares compatibles con tu perfil</p>
+          </div>
+          <span class="role-card-arrow">→</span>
+        </div>
+        <div class="role-card" onclick="showAuth('propietario','register')">
+          <div class="role-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </div>
+          <div class="role-card-text">
+            <h3>Tengo un piso</h3>
+            <p>Encuentra candidatos que encajen con la dinámica de tu hogar</p>
+          </div>
+          <span class="role-card-arrow">→</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ AUTH ═══════════════ -->
+<div id="page-auth" class="page">
+  <nav>
+    <a class="logomark" href="#" onclick="showPage('landing')">
+      <div class="logomark-icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+      <span class="logomark-text">Roomi<span>va</span></span>
+    </a>
+  </nav>
+  <div class="auth-wrap">
+    <button class="auth-back" onclick="showPage('landing')">← Volver</button>
+    <div class="auth-card">
+      <div class="auth-card-header">
+        <h2 id="auth-title">Bienvenido</h2>
+        <p id="auth-sub">Accede a tu cuenta o crea una nueva</p>
+      </div>
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tab-login" onclick="switchTab('login')">Iniciar sesión</button>
+        <button class="auth-tab" id="tab-register" onclick="switchTab('register')">Crear cuenta</button>
+      </div>
+      <div id="alert-auth"></div>
+      <!-- LOGIN -->
+      <div id="form-login">
+        <div class="form-group"><label>Email</label><input type="email" id="l-email" placeholder="tu@email.com"></div>
+        <div class="form-group"><label>Contraseña</label><input type="password" id="l-pass" placeholder="••••••••"></div>
+        <button class="btn btn-primary btn-lg btn-full" style="margin-top:8px" onclick="doLogin()">Entrar</button>
+      </div>
+      <!-- REGISTER -->
+      <div id="form-register" style="display:none">
+        <div class="form-group"><label>Nombre completo</label><input type="text" id="r-nombre" placeholder="Tu nombre"></div>
+        <div class="form-group"><label>Email</label><input type="email" id="r-email" placeholder="tu@email.com"></div>
+        <div class="form-group"><label>Contraseña</label><input type="password" id="r-pass" placeholder="Mínimo 6 caracteres"></div>
+        <div class="form-group">
+          <label>Soy</label>
+          <div class="role-toggle">
+            <button class="role-toggle-btn active" id="rt-candidato" onclick="setRol('candidato')">Busco habitación</button>
+            <button class="role-toggle-btn" id="rt-propietario" onclick="setRol('propietario')">Tengo un piso</button>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-lg btn-full" style="margin-top:8px" onclick="doRegister()">Crear cuenta</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ SETUP CANDIDATO ═══════════════ -->
+<div id="page-setup-candidato" class="page">
+  <nav>
+    <a class="logomark" href="#"><div class="logomark-icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><span class="logomark-text">Roomi<span>va</span></span></a>
+  </nav>
+  <div class="setup-wrap">
+    <div class="setup-header">
+      <div class="setup-step">Configuración de perfil</div>
+      <h2>Cuéntanos sobre ti</h2>
+      <p>Usaremos esta información para calcular tu compatibilidad con los hogares disponibles.</p>
+    </div>
+    <div class="setup-card">
+      <div id="alert-sc"></div>
+      <div class="form-row">
+        <div class="form-group"><label>Edad</label><input type="number" id="c-edad" placeholder="25" min="18" max="80"></div>
+        <div class="form-group"><label>Ocupación</label>
+          <select id="c-ocup"><option value="estudiante">Estudiante</option><option value="trabajador">Trabajador/a</option><option value="freelance">Freelance</option><option value="otro">Otro</option></select>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="section-label">Tu género</div>
+        <div class="chip-group" id="cg-genero">
+          <button class="chip" data-v="hombre" onclick="pickChip(this,'genero')">Hombre</button>
+          <button class="chip" data-v="mujer" onclick="pickChip(this,'genero')">Mujer</button>
+          <button class="chip" data-v="no_especificar" onclick="pickChip(this,'genero')">No especificar</button>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Presupuesto máximo (€/mes)</label><input type="number" id="c-presup" placeholder="650" min="200"></div>
+        <div class="form-group">
+          <label>Meses de estancia</label>
+          <input type="number" id="c-meses" placeholder="Ej: 9" min="3" max="36" oninput="updateDurC()">
+          <div class="duration-badge" id="dur-c"></div>
+          <div class="hint">Mínimo 3 meses</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Barrios preferidos <span style="font-weight:300;color:var(--text-3)">(uno o más)</span></label>
+        <div class="barrios-grid" id="barrios-c"></div>
+      </div>
+      <div class="form-group section-gap">
+        <div class="section-label">Estilo de convivencia</div>
+        <div class="chip-group" id="cg-estilo">
+          <button class="chip" data-v="tranquilo" onclick="pickChip(this,'estilo')">Tranquilo</button>
+          <button class="chip" data-v="social" onclick="pickChip(this,'estilo')">Social</button>
+          <button class="chip" data-v="mixto" onclick="pickChip(this,'estilo')">Mixto</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="section-label">Tolerancia al ruido</div>
+        <div class="chip-group" id="cg-ruido">
+          <button class="chip" data-v="baja" onclick="pickChip(this,'ruido')">Baja</button>
+          <button class="chip" data-v="media" onclick="pickChip(this,'ruido')">Media</button>
+          <button class="chip" data-v="alta" onclick="pickChip(this,'ruido')">Alta</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="section-label">Horario habitual</div>
+        <div class="chip-group" id="cg-horario">
+          <button class="chip" data-v="diurno" onclick="pickChip(this,'horario')">Diurno</button>
+          <button class="chip" data-v="nocturno" onclick="pickChip(this,'horario')">Nocturno</button>
+          <button class="chip" data-v="flexible" onclick="pickChip(this,'horario')">Flexible</button>
+        </div>
+      </div>
+      <div class="form-row section-gap">
+        <div class="form-group">
+          <div class="section-label">Mascotas</div>
+          <div class="yn-group">
+            <button class="yn-btn" id="yn-mascotas-si" onclick="setYN('mascotas',true)">Sí</button>
+            <button class="yn-btn selected" id="yn-mascotas-no" onclick="setYN('mascotas',false)">No</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <div class="section-label">Fumador/a</div>
+          <div class="yn-group">
+            <button class="yn-btn" id="yn-fumador-si" onclick="setYN('fumador',true)">Sí</button>
+            <button class="yn-btn selected" id="yn-fumador-no" onclick="setYN('fumador',false)">No</button>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="section-label">Preferencia de género en el hogar</div>
+        <div class="chip-group" id="cg-pgenero">
+          <button class="chip" data-v="sin_preferencia" onclick="pickChip(this,'pgenero')">Sin preferencia</button>
+          <button class="chip" data-v="mixto" onclick="pickChip(this,'pgenero')">Prefiero mixto</button>
+          <button class="chip" data-v="mismo_genero" onclick="pickChip(this,'pgenero')">Prefiero mismo género</button>
+        </div>
+      </div>
+      <div style="padding-top:20px; border-top:1px solid var(--border);margin-top:8px">
+        <button class="btn btn-primary btn-lg btn-full" onclick="submitCandidato()">Ver mis recomendaciones</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ SETUP PROPIETARIO ═══════════════ -->
+<div id="page-setup-propietario" class="page">
+  <nav>
+    <a class="logomark" href="#"><div class="logomark-icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><span class="logomark-text">Roomi<span>va</span></span></a>
+  </nav>
+  <div class="setup-wrap">
+    <div class="setup-header">
+      <div class="setup-step">Configuración de perfil</div>
+      <h2>Tu piso y hogar</h2>
+      <p>Describe tu piso y el perfil de convivencia para encontrar al compañero ideal.</p>
+    </div>
+    <div class="setup-card">
+      <div id="alert-sp"></div>
+      <div class="section-label">El piso</div>
+      <div class="form-group"><label>Título del anuncio</label><input type="text" id="p-titulo" placeholder="Ej: Habitación luminosa en Gràcia"></div>
+      <div class="form-row">
+        <div class="form-group"><label>Barrio</label><select id="p-barrio"></select></div>
+        <div class="form-group"><label>Precio mensual (€)</label><input type="number" id="p-precio" placeholder="650"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Plazas totales</label><input type="number" id="p-ptot" placeholder="3" min="2"></div>
+        <div class="form-group"><label>Plazas disponibles</label><input type="number" id="p-pdisp" placeholder="1" min="1"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Estancia mínima (meses)</label>
+          <input type="number" id="p-meses" placeholder="Ej: 6" min="3" oninput="updateDurP()">
+          <div class="duration-badge" id="dur-p"></div>
+        </div>
+        <div class="form-group">
+          <div class="section-label" style="margin-bottom:10px">Normas</div>
+          <div style="display:flex;gap:12px">
+            <div style="flex:1">
+              <div style="font-size:0.78rem;color:var(--text-2);margin-bottom:5px">Mascotas</div>
+              <div class="yn-group"><button class="yn-btn" id="p-mas-si" onclick="setPYN('mascotas',true)">Sí</button><button class="yn-btn selected" id="p-mas-no" onclick="setPYN('mascotas',false)">No</button></div>
+            </div>
+            <div style="flex:1">
+              <div style="font-size:0.78rem;color:var(--text-2);margin-bottom:5px">Fumar</div>
+              <div class="yn-group"><button class="yn-btn" id="p-fum-si" onclick="setPYN('fumar',true)">Sí</button><button class="yn-btn selected" id="p-fum-no" onclick="setPYN('fumar',false)">No</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="section-label section-gap">Dinámica del hogar</div>
+      <div class="form-group">
+        <label>Estilo de convivencia</label>
+        <div class="chip-group" id="cg-p-estilo">
+          <button class="chip" data-v="tranquilo" onclick="pickChip(this,'p-estilo')">Tranquilo</button>
+          <button class="chip" data-v="social" onclick="pickChip(this,'p-estilo')">Social</button>
+          <button class="chip" data-v="mixto" onclick="pickChip(this,'p-estilo')">Mixto</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Tolerancia al ruido</label>
+        <div class="chip-group" id="cg-p-ruido">
+          <button class="chip" data-v="baja" onclick="pickChip(this,'p-ruido')">Baja</button>
+          <button class="chip" data-v="media" onclick="pickChip(this,'p-ruido')">Media</button>
+          <button class="chip" data-v="alta" onclick="pickChip(this,'p-ruido')">Alta</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Horario predominante</label>
+        <div class="chip-group" id="cg-p-horario">
+          <button class="chip" data-v="diurno" onclick="pickChip(this,'p-horario')">Diurno</button>
+          <button class="chip" data-v="nocturno" onclick="pickChip(this,'p-horario')">Nocturno</button>
+          <button class="chip" data-v="flexible" onclick="pickChip(this,'p-horario')">Flexible</button>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Rango de edad buscado</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="number" id="p-emin" placeholder="18" style="flex:1">
+            <span style="color:var(--text-3);font-size:0.85rem">—</span>
+            <input type="number" id="p-emax" placeholder="35" style="flex:1">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Ocupación preferida</label>
+          <select id="p-ocup-pref"><option value="">Sin preferencia</option><option value="estudiante">Estudiante</option><option value="trabajador">Trabajador/a</option><option value="freelance">Freelance</option></select>
+        </div>
+      </div>
+      <div style="padding-top:20px;border-top:1px solid var(--border);margin-top:8px">
+        <button class="btn btn-primary btn-lg btn-full" onclick="submitPropietario()">Ver candidatos compatibles</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ DASHBOARD CANDIDATO ═══════════════ -->
+<div id="page-dash-candidato" class="page">
+  <div class="dash-nav">
+    <a class="logomark" href="#"><div class="logomark-icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><span class="logomark-text">Roomi<span>va</span></span></a>
+    <div class="dash-tabs">
+      <button class="dash-tab active" onclick="showDashPanel('c','recomendaciones')">Recomendaciones</button>
+      <button class="dash-tab" onclick="showDashPanel('c','preferencias')">Preferencias</button>
+    </div>
+    <div class="dash-user-info">
+      <div class="dash-avatar" id="dc-avatar">R</div>
+      <span class="dash-username" id="dc-name"></span>
+      <button class="btn btn-ghost" style="margin-left:4px" onclick="doLogout()">Salir</button>
+    </div>
+  </div>
+  <div class="dash-body">
+    <!-- Panel recomendaciones -->
+    <div class="dash-panel active" id="dp-c-recomendaciones">
+      <div class="dash-panel-header">
+        <h2 id="dc-welcome">Tus recomendaciones</h2>
+        <p>Hogares ordenados por compatibilidad con tu perfil</p>
+      </div>
+      <div class="dash-grid">
+        <div class="profile-sidebar">
+          <div class="profile-card" id="dc-profile-card"></div>
+        </div>
+        <div>
+          <div class="results-toolbar">
+            <h3>Pisos recomendados</h3>
+            <span class="results-count" id="dc-count"></span>
+          </div>
+          <div id="dc-results"><div class="loading"><div class="spinner"></div><p>Calculando compatibilidad...</p></div></div>
+        </div>
+      </div>
+    </div>
+    <!-- Panel preferencias -->
+    <div class="dash-panel" id="dp-c-preferencias">
+      <div class="dash-panel-header">
+        <h2>Preferencias</h2>
+        <p>Actualiza tu perfil para refinar las recomendaciones</p>
+      </div>
+      <div class="settings-wrap" id="dc-settings"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ DASHBOARD PROPIETARIO ═══════════════ -->
+<div id="page-dash-propietario" class="page">
+  <div class="dash-nav">
+    <a class="logomark" href="#"><div class="logomark-icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><span class="logomark-text">Roomi<span>va</span></span></a>
+    <div class="dash-tabs">
+      <button class="dash-tab active" onclick="showDashPanel('p','recomendaciones')">Candidatos</button>
+      <button class="dash-tab" onclick="showDashPanel('p','preferencias')">Preferencias</button>
+    </div>
+    <div class="dash-user-info">
+      <div class="dash-avatar" id="dp-avatar">R</div>
+      <span class="dash-username" id="dp-name"></span>
+      <button class="btn btn-ghost" style="margin-left:4px" onclick="doLogout()">Salir</button>
+    </div>
+  </div>
+  <div class="dash-body">
+    <div class="dash-panel active" id="dp-p-recomendaciones">
+      <div class="dash-panel-header">
+        <h2 id="dp-welcome">Candidatos compatibles</h2>
+        <p>Personas ordenadas por compatibilidad con la dinámica de tu hogar</p>
+      </div>
+      <div class="dash-grid">
+        <div class="profile-sidebar">
+          <div class="profile-card" id="dp-profile-card"></div>
+        </div>
+        <div>
+          <div class="results-toolbar">
+            <h3>Candidatos recomendados</h3>
+            <span class="results-count" id="dp-count"></span>
+          </div>
+          <div id="dp-results"><div class="loading"><div class="spinner"></div><p>Buscando candidatos...</p></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="dash-panel" id="dp-p-preferencias">
+      <div class="dash-panel-header">
+        <h2>Preferencias</h2>
+        <p>Actualiza los datos de tu piso o las características que buscas</p>
+      </div>
+      <div class="settings-wrap" id="dp-settings"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';
+const BARRIOS = ["Eixample","Gràcia","Sant Martí","Sants-Montjuïc","Sarrià-Sant Gervasi","Horta-Guinardó","Nou Barris","Sant Andreu","Ciutat Vella","Les Corts","Poblenou","Barceloneta","El Born","Sagrada Família","Esquerra de l'Eixample","Dreta de l'Eixample","Vila de Gràcia","Camp de l'Arpa","Clot","Sant Pere"];
+
+let S = { token:null, rol:null, nombre:null, uid:null, cid:null, lid:null, authRol:'candidato' };
+let _lastResults = [];
+let chips = {};
+let yn = { mascotas:false, fumador:false };
+let pyn = { mascotas:false, fumar:false };
+let cachedCandidate = null, cachedListing = null;
+
+// ── ROUTING ──
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+function showAuth(rol, tab) {
+  S.authRol = rol;
+  showPage('auth');
+  switchTab(tab);
+}
+
+function showDashPanel(dash, panel) {
+  const prefix = `dp-${dash}-`;
+  document.querySelectorAll(`[id^="${prefix}"]`).forEach(p => p.classList.remove('active'));
+  document.getElementById(`${prefix}${panel}`).classList.add('active');
+  const tabs = document.querySelectorAll(`#page-dash-${dash==='c'?'candidato':'propietario'} .dash-tab`);
+  tabs.forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  if (panel === 'preferencias') {
+    dash === 'c' ? renderCandidateSettings() : renderPropietarioSettings();
+  }
+}
+
+// ── AUTH ──
+function switchTab(tab) {
+  document.getElementById('form-login').style.display = tab==='login' ? 'block' : 'none';
+  document.getElementById('form-register').style.display = tab==='register' ? 'block' : 'none';
+  document.getElementById('tab-login').classList.toggle('active', tab==='login');
+  document.getElementById('tab-register').classList.toggle('active', tab==='register');
+  document.getElementById('alert-auth').innerHTML = '';
+}
+
+function setRol(rol) {
+  S.authRol = rol;
+  document.getElementById('rt-candidato').classList.toggle('active', rol==='candidato');
+  document.getElementById('rt-propietario').classList.toggle('active', rol==='propietario');
+}
+
+function showAlert(id, msg, type='error') {
+  document.getElementById(id).innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+}
+
+async function post(path, body, token) {
+  const h = {'Content-Type':'application/json'};
+  if(token) h['x-token'] = token;
+  try {
+    const r = await fetch(API+path,{method:'POST',headers:h,body:JSON.stringify(body)});
+    const text = await r.text();
+    let data;
+    try { data = JSON.parse(text); } catch(e) { console.error('Non-JSON response from '+path+':', text); data = {detail: 'Error del servidor: ' + text.substring(0,100)}; }
+    return {ok:r.ok, data};
+  } catch(e) {
+    console.error('Network error on '+path+':', e);
+    return {ok:false, data:{detail:'No se puede conectar con el servidor. ¿Está la API corriendo en localhost:8000?'}};
+  }
+}
+
+async function get(path, token) {
+  const h = token ? {'x-token':token} : {};
+  try {
+    const r = await fetch(API+path,{headers:h});
+    const text = await r.text();
+    let data;
+    try { data = JSON.parse(text); } catch(e) { console.error('Non-JSON response from '+path+':', text); data = {detail: 'Error del servidor'}; }
+    return {ok:r.ok, data};
+  } catch(e) {
+    console.error('Network error on '+path+':', e);
+    return {ok:false, data:{detail:'No se puede conectar con el servidor.'}};
+  }
+}
+
+async function doLogin() {
+  const email = document.getElementById('l-email').value.trim();
+  const password = document.getElementById('l-pass').value;
+  if(!email||!password) return showAlert('alert-auth','Rellena todos los campos');
+  const {ok,data} = await post('/auth/login',{email,password});
+  if(!ok) return showAlert('alert-auth', data.detail||'Credenciales incorrectas');
+  Object.assign(S,{token:data.token,rol:data.rol,nombre:data.nombre,uid:data.user_id,cid:data.candidate_id,lid:data.listing_id});
+  afterLogin();
+}
+
+async function doRegister() {
+  const nombre = document.getElementById('r-nombre').value.trim();
+  const email = document.getElementById('r-email').value.trim();
+  const password = document.getElementById('r-pass').value;
+  if(!nombre||!email||!password) return showAlert('alert-auth','Rellena todos los campos');
+  if(password.length<6) return showAlert('alert-auth','La contraseña debe tener al menos 6 caracteres');
+  const {ok,data} = await post('/auth/register',{nombre,email,password,rol:S.authRol});
+  if(!ok) return showAlert('alert-auth', data.detail||'Error al registrar');
+  Object.assign(S,{token:data.token,rol:data.rol,nombre:data.nombre,uid:data.user_id});
+  afterLogin();
+}
+
+function afterLogin() {
+  if(S.rol==='candidato') { S.cid ? loadCandidateDash() : initSetupC(); }
+  else { S.lid ? loadPropietarioDash() : initSetupP(); }
+}
+
+function doLogout() {
+  Object.assign(S,{token:null,rol:null,nombre:null,uid:null,cid:null,lid:null});
+  cachedCandidate=null; cachedListing=null;
+  showPage('landing');
+}
+
+// ── CHIPS & TOGGLES ──
+function pickChip(el, group) {
+  document.querySelectorAll(`#cg-${group} .chip`).forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  chips[group] = el.dataset.v;
+}
+
+function setYN(k, v) {
+  yn[k]=v;
+  document.getElementById(`yn-${k}-si`).classList.toggle('selected',v);
+  document.getElementById(`yn-${k}-no`).classList.toggle('selected',!v);
+}
+
+function setPYN(k, v) {
+  pyn[k]=v;
+  document.getElementById(`p-${k==='mascotas'?'mas':'fum'}-si`).classList.toggle('selected',v);
+  document.getElementById(`p-${k==='mascotas'?'mas':'fum'}-no`).classList.toggle('selected',!v);
+}
+
+function durLabel(m) {
+  if(m<=6) return `${m} meses — Corta estancia`;
+  if(m<=12) return `${m} meses — Media estancia`;
+  return `${m} meses — Larga estancia`;
+}
+
+function updateDurC() {
+  const m = parseInt(document.getElementById('c-meses').value);
+  const el = document.getElementById('dur-c');
+  if(!m||m<3){el.classList.remove('visible');return;}
+  el.textContent = durLabel(m); el.classList.add('visible');
+}
+
+function updateDurP() {
+  const m = parseInt(document.getElementById('p-meses').value);
+  const el = document.getElementById('dur-p');
+  if(!m||m<3){el.classList.remove('visible');return;}
+  el.textContent = durLabel(m); el.classList.add('visible');
+}
+
+// ── SETUP CANDIDATO ──
+function initSetupC() {
+  document.getElementById('barrios-c').innerHTML =
+    BARRIOS.map(b=>`<button class="barrio-chip" data-b="${b}" onclick="this.classList.toggle('selected')">${b}</button>`).join('');
+  showPage('setup-candidato');
+}
+
+async function submitCandidato() {
+  const edad=parseInt(document.getElementById('c-edad').value);
+  const ocupacion=document.getElementById('c-ocup').value;
+  const presupuesto=parseFloat(document.getElementById('c-presup').value);
+  const meses=parseInt(document.getElementById('c-meses').value);
+  const barrios=[...document.querySelectorAll('#barrios-c .barrio-chip.selected')].map(el=>el.dataset.b);
+  if(!edad||!presupuesto||!meses) return showAlert('alert-sc','Rellena edad, presupuesto y meses');
+  if(meses<3) return showAlert('alert-sc','La estancia mínima es 3 meses');
+  if(!barrios.length) return showAlert('alert-sc','Selecciona al menos un barrio');
+  if(!chips.estilo) return showAlert('alert-sc','Selecciona estilo de convivencia');
+  if(!chips.ruido) return showAlert('alert-sc','Selecciona tolerancia al ruido');
+  if(!chips.horario) return showAlert('alert-sc','Selecciona tu horario');
+  const pgenero = chips.pgenero || 'sin_preferencia';
+  const genero = chips.genero || 'no_especificar';
+  const body={edad,ocupacion,presupuesto_max:presupuesto,barrios_preferidos:barrios,meses_estancia:meses,
+    estilo_convivencia:chips.estilo,tolerancia_ruido:chips.ruido,horario:chips.horario,
+    acepta_mascotas:yn.mascotas,fumador:yn.fumador,genero,preferencia_genero:pgenero};
+  const {ok,data}=await post('/profile/candidate',body,S.token);
+  if(!ok) return showAlert('alert-sc',data.detail||'Error al guardar');
+  S.cid=data.candidate_id;
+  loadCandidateDash();
+}
+
+async function sendFeedback(idx, valor) {
+  const r = _lastResults[idx];
+  if(!r) return;
+  const fbDiv = document.getElementById('fb-'+idx);
+  if(fbDiv && fbDiv.dataset.sent) return;
+  const {ok} = await post('/feedback', {listing_id: r.target_id, score_detalle: r.score_detalle, valor}, S.token);
+  if(ok && fbDiv) {
+    fbDiv.dataset.sent = '1';
+    fbDiv.querySelectorAll('.feedback-btn').forEach(b => b.classList.add('sent'));
+    fbDiv.querySelectorAll('.feedback-btn')[valor === 1 ? 0 : 1].classList.add('active');
+  }
+}
+
+// ── SETUP PROPIETARIO ──
+function initSetupP() {
+  const sel=document.getElementById('p-barrio');
+  sel.innerHTML=BARRIOS.map(b=>`<option value="${b}">${b}</option>`).join('');
+  showPage('setup-propietario');
+}
+
+async function submitPropietario() {
+  const titulo=document.getElementById('p-titulo').value.trim();
+  const barrio=document.getElementById('p-barrio').value;
+  const precio=parseFloat(document.getElementById('p-precio').value);
+  const ptot=parseInt(document.getElementById('p-ptot').value);
+  const pdisp=parseInt(document.getElementById('p-pdisp').value);
+  const meses=parseInt(document.getElementById('p-meses').value);
+  const emin=parseInt(document.getElementById('p-emin').value)||18;
+  const emax=parseInt(document.getElementById('p-emax').value)||99;
+  const ocup=document.getElementById('p-ocup-pref').value||null;
+  if(!titulo||!precio||!ptot||!pdisp||!meses) return showAlert('alert-sp','Rellena todos los campos del piso');
+  if(!chips['p-estilo']||!chips['p-ruido']||!chips['p-horario']) return showAlert('alert-sp','Selecciona estilo, ruido y horario del hogar');
+  const body={titulo,barrio,precio_mes:precio,plazas_totales:ptot,plazas_disponibles:pdisp,
+    meses_minimos:meses,permite_mascotas:pyn.mascotas,permite_fumar:pyn.fumar,
+    estilo_convivencia:chips['p-estilo'],tolerancia_ruido:chips['p-ruido'],
+    horario_predominante:chips['p-horario'],perfil_buscado_ocupacion:ocup,
+    perfil_buscado_edad_min:emin,perfil_buscado_edad_max:emax,num_convivientes_actuales:1};
+  const {ok,data}=await post('/profile/listing',body,S.token);
+  if(!ok) return showAlert('alert-sp',data.detail||'Error al guardar');
+  S.lid=data.listing_id;
+  loadPropietarioDash();
+}
+
+// ── DASHBOARDS ──
+async function loadCandidateDash() {
+  showPage('dash-candidato');
+  document.getElementById('dc-avatar').textContent=S.nombre.charAt(0).toUpperCase();
+  document.getElementById('dc-name').textContent=S.nombre;
+  document.getElementById('dc-welcome').textContent=`Hola, ${S.nombre.split(' ')[0]}`;
+  const {ok,data}=await get(`/candidates/${S.cid}`,S.token);
+  if(ok){ cachedCandidate=data; renderCandidateProfile(data); }
+  const {ok:rok,data:recs}=await get('/recommend/listings?top_n=10',S.token);
+  document.getElementById('dc-count').textContent=rok?`${recs.length} resultado${recs.length!==1?'s':''}`:'-';
+  if(rok && recs.length) { _lastResults = recs; }
+  document.getElementById('dc-results').innerHTML=rok&&recs.length
+    ? recs.map((r,i)=>resultCard(r,i)).join('')
+    : '<div class="empty"><h3>Sin resultados</h3><p>No hay pisos que coincidan con tus criterios actuales</p></div>';
+}
+
+function renderCandidateProfile(d) {
+  const dur=d.duracion_deseada==='corta'?'Corta':d.duracion_deseada==='media'?'Media':'Larga';
+  document.getElementById('dc-profile-card').innerHTML=`
+    <div class="profile-card-header"><h3>Tu perfil</h3></div>
+    <div class="profile-row"><span class="profile-row-label">Presupuesto</span><span class="profile-row-val">${d.presupuesto_max}€/mes</span></div>
+    <div class="profile-row"><span class="profile-row-label">Estancia</span><span class="profile-row-val">${d.meses_estancia} meses &nbsp;<span class="badge badge-green">${dur}</span></span></div>
+    <div class="profile-row"><span class="profile-row-label">Estilo</span><span class="profile-row-val">${d.estilo_convivencia}</span></div>
+    <div class="profile-row"><span class="profile-row-label">Horario</span><span class="profile-row-val">${d.horario}</span></div>
+    <div class="profile-row"><span class="profile-row-label">Ruido</span><span class="profile-row-val">${d.tolerancia_ruido}</span></div>
+    <div class="profile-row"><span class="profile-row-label">Barrios</span><span class="profile-row-val">${d.barrios_preferidos.replace(/,/g,', ')}</span></div>`;
+}
+
+async function loadPropietarioDash() {
+  showPage('dash-propietario');
+  document.getElementById('dp-avatar').textContent=S.nombre.charAt(0).toUpperCase();
+  document.getElementById('dp-name').textContent=S.nombre;
+  document.getElementById('dp-welcome').textContent=`Hola, ${S.nombre.split(' ')[0]}`;
+  const {ok,data}=await get(`/listings/${S.lid}`,S.token);
+  if(ok){ cachedListing=data; renderListingProfile(data); }
+  const {ok:rok,data:recs}=await get('/recommend/candidates?top_n=10',S.token);
+  document.getElementById('dp-count').textContent=rok?`${recs.length} resultado${recs.length!==1?'s':''}`:'-';
+  document.getElementById('dp-results').innerHTML=rok&&recs.length
+    ? recs.map((r,i)=>resultCard(r,i)).join('')
+    : '<div class="empty"><h3>Sin resultados</h3><p>No hay candidatos que coincidan con los criterios del hogar</p></div>';
+}
+
+function renderListingProfile(d) {
+  const dur=d.duracion_minima==='corta'?'Corta':d.duracion_minima==='media'?'Media':'Larga';
+  document.getElementById('dp-profile-card').innerHTML=`
+    <div class="profile-card-header"><h3>Tu piso</h3></div>
+    <div class="profile-row"><span class="profile-row-label">Barrio</span><span class="profile-row-val">${d.barrio}</span></div>
+    <div class="profile-row"><span class="profile-row-label">Precio</span><span class="profile-row-val">${d.precio_mes}€/mes</span></div>
+    <div class="profile-row"><span class="profile-row-label">Estancia mín.</span><span class="profile-row-val">${d.meses_minimos} meses &nbsp;<span class="badge badge-green">${dur}</span></span></div>
+    <div class="profile-row"><span class="profile-row-label">Plazas</span><span class="profile-row-val">${d.plazas_disponibles} libre${d.plazas_disponibles!==1?'s':''} / ${d.plazas_totales}</span></div>
+    <div class="profile-row"><span class="profile-row-label">Mascotas</span><span class="profile-row-val">${d.permite_mascotas?'Permitidas':'No permitidas'}</span></div>
+    <div class="profile-row"><span class="profile-row-label">Fumar</span><span class="profile-row-val">${d.permite_fumar?'Permitido':'No permitido'}</span></div>`;
+}
+
+// ── SETTINGS ──
+function renderCandidateSettings() {
+  const d = cachedCandidate || {};
+  document.getElementById('dc-settings').innerHTML = `
+    <div class="settings-section">
+      <div class="settings-section-header"><h3>Datos personales</h3></div>
+      <div class="settings-row"><div class="settings-row-info"><div class="settings-row-label">Edad</div></div><div class="settings-row-control"><input type="number" id="s-edad" value="${d.edad||''}"></div></div>
+      <div class="settings-row"><div class="settings-row-info"><div class="settings-row-label">Ocupación</div></div><div class="settings-row-control"><select id="s-ocup"><option value="estudiante" ${d.ocupacion==='estudiante'?'selected':''}>Estudiante</option><option value="trabajador" ${d.ocupacion==='trabajador'?'selected':''}>Trabajador/a</option><option value="freelance" ${d.ocupacion==='freelance'?'selected':''}>Freelance</option><option value="otro" ${d.ocupacion==='otro'?'selected':''}>Otro</option></select></div></div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-header"><h3>Búsqueda</h3></div>
+      <div class="settings-row"><div class="settings-row-info"><div class="settings-row-label">Presupuesto máximo</div><div class="settings-row-sub">€ por mes</div></div><div class="settings-row-control"><input type="number" id="s-presup" value="${d.presupuesto_max||''}"></div></div>
+      <div class="settings-row"><div class="settings-row-info"><div class="settings-row-label">Meses de estancia</div></div><div class="settings-row-control"><input type="number" id="s-meses" value="${d.meses_estancia||''}" min="3"></div></div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-header"><h3>Convivencia</h3></div>
+      <div class="settings-row"><div class="settings-row-info"><div class="settings-row-label">Estilo</div></div><div class="settings-row-control"><select id="s-estilo"><option value="tranquilo" ${d.estilo_convivencia==='tranquilo'?'selected':''}>Tranquilo</option><option value="social" ${d.estilo_convivencia==='social'?'selected':''}>Social</option><option value="mixto" ${d.estilo_convivencia==='mixto'?'selected':''}>Mixto</option></select></div></div>
+      <div class="settings-row"><div class="settings-row-info"><div class="settings-row-label">Tolerancia al ruido</div></div><div class="settings-row-control"><select id="s-ruido"><option value="baja" ${d.tolerancia_ruido==='baja'?'selected':''}>Baja</option><option value="media" ${d.tolerancia_ruido==='media'?'selected':''}>Media</option><option value="alta" ${d.tolerancia_ruido==='alta'?'selected':''}>Alta</option></select></div></div>
+      <div class="settings-row"><div class="settings-row-info"><div class="settings-row-label">Horario</div></div><div class="settings-row-control"><select id="s-horario"><option value="diurno" ${d.horario==='diurno'?'selected':''}>Diurno</option><option value="nocturno" ${d.horario==='nocturno'?'selected':''}>Nocturno</option><option value="flexible" ${d.horario==='flexible'?'selected':''}>Flexible</option></select></div></div>
+    </div>
+    <div class="settings-save-bar">
+      <button class="btn btn-outline" onclick="showDashPanel('c','recomendaciones');document.querySelectorAll('#page-dash-candidato .dash-tab')[0].classList.add('active');document.querySelectorAll('#page-dash-candidato .dash-tab')[1].classList.remove('active')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveSettings()">Guardar cambios</button>
+    </div>`;
+}
+
+function renderPropietarioSettings() {
+  const d = cachedListing || {};
+  document.getElementById('dp-settings').innerHTML = `
+    <div class="settings-section">
+      <div class="settings-section-header"><h3>El piso</h3></div>
+      <div class="settings-row"><div class="settings-row-info"><div class="settings-row-label">Precio mensual</div><div class="settings-row-sub">€ por mes</div></div><div class="settings-row-control"><input type="number" id="sp-precio" value="${d.precio_mes||''}"></div></div>
+      <div class="settings-row"><div class="settings-row-info"><div class="settings-row-label">Plazas disponibles</div></div><div class="settings-row-control"><input type="number" id="sp-pdisp" value="${d.plazas_disponibles||''}" min="0"></div></div>
+      <div class="settings-row"><div class="settings-row-info"><div class="settings-row-label">Estancia mínima</div><div class="settings-row-sub">Meses</div></div><div class="settings-row-control"><input type="number" id="sp-meses" value="${d.meses_minimos||''}" min="3"></div></div>
+    </div>
+    <div class="settings-save-bar">
+      <button class="btn btn-outline" onclick="showDashPanel('p','recomendaciones');document.querySelectorAll('#page-dash-propietario .dash-tab')[0].classList.add('active');document.querySelectorAll('#page-dash-propietario .dash-tab')[1].classList.remove('active')">Cancelar</button>
+      <button class="btn btn-primary" onclick="alert('Guardado. Recarga para ver cambios actualizados.')">Guardar cambios</button>
+    </div>`;
+}
+
+async function saveSettings() {
+  alert('Cambios guardados. Recarga las recomendaciones para ver los resultados actualizados.');
+}
+
+// ── RESULT CARDS ──
+const BAR_COLORS = {estilo_convivencia:'#1A3A2A',tolerancia_ruido:'#2D6147',horario:'#4A8C6A',duracion:'#7BA894',edad:'#A8C5BA',ocupacion:'#C8DBD4'};
+const BAR_LABELS = {estilo_convivencia:'Estilo',tolerancia_ruido:'Ruido',horario:'Horario',duracion:'Duración',edad:'Edad',ocupacion:'Ocupación'};
+
+function resultCard(r, i) {
+  const sc = r.score_pct>=70?'sb-high':r.score_pct>=45?'sb-mid':'sb-low';
+  const info = r.listing_info || {};
+  const bars = Object.entries(r.score_detalle||{}).map(([k,v])=>`
+    <div class="rc-bar-item">
+      <div class="rc-bar-label">${BAR_LABELS[k]||k}</div>
+      <div class="rc-bar-track"><div class="rc-bar-fill" style="width:${Math.round(v*100)}%;background:${BAR_COLORS[k]||'#1A3A2A'}"></div></div>
+    </div>`).join('');
+  const allTags = Object.entries(r.score_detalle||{}).map(([k,v]) => {
+    const label = BAR_LABELS[k]||k;
+    const tagClass = v >= 0.65 ? 'tag-pos' : v >= 0.35 ? 'tag-warn' : 'tag-neg';
+    // Find matching reason or warning
+    const allMsgs = [...(r.razones||[]), ...(r.advertencias||[])];
+    const msg = allMsgs.find(m => {
+      const kmap = {estilo_convivencia:'estilo',tolerancia_ruido:'ruido',horario:'horario',
+                    duracion:'estancia',edad:'años',ocupacion:'busca',genero:'género'};
+      return m.toLowerCase().includes(kmap[k]||k);
+    }) || label;
+    return `<span class="tag ${tagClass}">${msg}</span>`;
+  }).join('');
+
+  // Listing info pills
+  let infoPills = '';
+  if(info.precio_mes) infoPills += `<span class="info-pill">${info.precio_mes}€/mes</span>`;
+  if(info.barrio) infoPills += `<span class="info-pill">${info.barrio}</span>`;
+  if(info.meses_minimos) infoPills += `<span class="info-pill">Mín. ${info.meses_minimos} meses</span>`;
+  if(info.plazas_disponibles) infoPills += `<span class="info-pill">${info.plazas_disponibles} plaza${info.plazas_disponibles!==1?'s':''} libre${info.plazas_disponibles!==1?'s':''}</span>`;
+  if(info.permite_mascotas) infoPills += `<span class="info-pill info-pill-green">Mascotas OK</span>`;
+  if(info.permite_fumar) infoPills += `<span class="info-pill info-pill-amber">Fumar OK</span>`;
+
+  // Candidate info pills
+  if(info.edad) infoPills += `<span class="info-pill">${info.edad} años</span>`;
+  if(info.ocupacion) infoPills += `<span class="info-pill">${info.ocupacion}</span>`;
+  if(info.presupuesto_max) infoPills += `<span class="info-pill">Hasta ${info.presupuesto_max}€</span>`;
+  if(info.meses_estancia) infoPills += `<span class="info-pill">${info.meses_estancia} meses</span>`;
+
+  const desc = info.descripcion ? `<div class="rc-desc">${info.descripcion}</div>` : '';
+
+  return `
+  <div class="result-card">
+    <div class="rc-main" onclick="toggleRCDetail('rcd-${i}',this.closest('.result-card'))">
+      <div class="rc-content">
+        <div class="rc-title">${r.target_nombre}</div>
+        <div class="rc-info-pills">${infoPills}</div>
+        ${desc}
+        <div class="rc-bars" style="margin-top:10px">${bars}</div>
+      </div>
+      <div class="score-badge ${sc}"><span class="sb-n">${r.score_pct}%</span><span class="sb-l">match</span></div>
+    </div>
+    <div class="rc-detail" id="rcd-${i}">
+      <div class="rc-tags" style="margin-bottom:12px">${allTags}</div>
+      <div class="rc-feedback" id="fb-${i}">
+        <span style="font-size:0.75rem;color:var(--text-3);margin-right:8px">¿Te interesa?</span>
+        <button class="feedback-btn feedback-yes" onclick="sendFeedback(${i}, 1)">Me interesa</button>
+        <button class="feedback-btn feedback-no" onclick="sendFeedback(${i}, 0)">No encaja</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function toggleRCDetail(id, card) {
+  const el=document.getElementById(id);
+  el.classList.toggle('open');
+  card.classList.toggle('open');
+}
+</script>
+</body>
+</html>
