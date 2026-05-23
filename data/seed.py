@@ -1,147 +1,208 @@
-"""Dataset sintético v3 — 40 pisos variados, precios desde 300€, coherencia precio-barrio."""
+"""Dataset sintético v4 — hogares con convivientes individuales."""
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from models.models import (Candidate, Listing, Household, Ocupacion, EstiloConvivencia,
-    ToleranciaRuido, Duracion, Horario, PreferenciaGenero, meses_a_duracion)
-from database.db import init_db, insert_candidate, insert_listing, insert_household, get_connection
+from models.models import (Candidate, Listing, Household, Roommate,
+    Ocupacion, EstiloConvivencia, ToleranciaRuido, Duracion, Horario,
+    Genero, PreferenciaGenero, meses_a_duracion)
+from database.db import (init_db, insert_candidate, insert_listing,
+    insert_household, insert_roommate, get_connection)
 
-# (titulo, barrio, precio, plazas_tot, plazas_disp, meses_min, mascotas, fumar, descripcion)
 LISTINGS_RAW = [
-    # ECONÓMICOS 300–400€ (barrios periféricos)
-    ("Habitación asequible en Nou Barris",       "Nou Barris",               300, 4, 2, 3,  False, False, "Piso amplio y funcional. Buenas conexiones de metro. Compañeros estudiantes."),
-    ("Hab. tranquila en Horta-Guinardó",         "Horta-Guinardó",           310, 5, 3, 3,  False, True,  "Ambiente tranquilo, cocina equipada, wifi incluido. Zona residencial bien comunicada."),
-    ("Hab. en piso familiar Sant Andreu",        "Sant Andreu",              320, 4, 2, 6,  True,  False, "Piso amplio con terraza. Mascotas pequeñas bienvenidas. Barrio tranquilo."),
-    ("Hab. económica en Sants",                  "Sants-Montjuïc",           330, 4, 2, 4,  False, False, "Muy bien comunicado con Sants Estació. Piso luminoso con buenas zonas comunes."),
-    ("Hab. piso estudiantes Clot",               "Clot",                     340, 5, 3, 4,  False, False, "Piso joven y social. Cerca transporte y universidad. Comunidad activa."),
-    ("Hab. en Nou Barris reformada",             "Nou Barris",               360, 3, 1, 6,  False, False, "Piso reformado en 2022. Ascensor. Compañeros trabajadores tranquilos."),
-    ("Hab. con jardín en Horta",                 "Horta-Guinardó",           370, 4, 2, 6,  True,  False, "Jardín compartido. Barrio residencial silencioso. Mascotas permitidas."),
-    ("Hab. asequible en Sant Andreu norte",      "Sant Andreu",              380, 4, 1, 6,  False, False, "Zona tranquila con parques. Piso bien mantenido, compañeros respetuosos."),
-
-    # RANGO MEDIO-BAJO 400–520€
-    ("Hab. social en Vila de Gràcia",            "Vila de Gràcia",           410, 4, 2, 6,  False, False, "Piso muy social en el corazón de Gràcia. Ambiente festivo y abierto."),
-    ("Hab. luminosa en Camp de l'Arpa",          "Camp de l'Arpa",           420, 3, 1, 6,  False, False, "Piso moderno y luminoso. Buena comunidad de jóvenes profesionales."),
-    ("Hab. tranquila Sagrada Família",           "Sagrada Família",          430, 3, 1, 9,  False, False, "Piso silencioso, compañeros respetuosos. Cerca de universidades y transporte."),
-    ("Hab. en Sant Pere céntrico",               "Sant Pere",                440, 4, 2, 6,  False, True,  "Zona histórica céntrica. Ambiente mixto joven. Fumadores bienvenidos en terraza."),
-    ("Hab. profesional en Sants",                "Sants-Montjuïc",           450, 3, 1, 12, False, False, "Compañeros trabajadores, ambiente muy organizado. Piso bien equipado."),
-    ("Hab. con encanto en El Born",              "El Born",                  460, 3, 1, 6,  False, False, "Piso con carácter, techos altos. Compañeros creativos y abiertos."),
-    ("Hab. en Poblenou tecnológico",             "Poblenou",                 470, 4, 2, 9,  False, False, "Zona 22@ en auge. Ideal para trabajadores del sector tech. Ambiente dinámico."),
-    ("Hab. con terraza en Clot",                 "Clot",                     490, 3, 1, 9,  False, False, "Acceso a terraza privada. Compañeros jóvenes trabajadores. Muy soleado."),
-    ("Hab. en Esquerra de l'Eixample",           "Esquerra de l'Eixample",   500, 4, 2, 9,  False, False, "Eixample izquierdo animado. Cerca de bares, restaurantes y transporte."),
-    ("Hab. tranquila en Sant Martí",             "Sant Martí",               510, 3, 1, 12, False, False, "Barrio tranquilo en expansión. Compañeros profesionales. Piso bien organizado."),
-    ("Hab. cerca del mar Barceloneta",           "Barceloneta",              520, 3, 1, 3,  False, True,  "Cerca del mar. Ambiente veraniego y social. Ideal para estancias cortas."),
-    ("Hab. en Gràcia con carácter",              "Gràcia",                   530, 3, 1, 6,  False, False, "Piso acogedor en Gràcia. Comunidad mixta y abierta. Mucha luz natural."),
-
-    # RANGO MEDIO 540–700€
-    ("Hab. moderna en Vila de Gràcia",           "Vila de Gràcia",           540, 3, 1, 9,  False, False, "Zona muy buscada. Piso tranquilo con buena convivencia. Terrazas comunitarias."),
-    ("Hab. premium El Born",                     "El Born",                  560, 3, 1, 9,  False, False, "Piso con encanto en el Born. Techos originales, suelos de madera. Ambiente cultural."),
-    ("Hab. en Eixample derecho",                 "Dreta de l'Eixample",      580, 4, 2, 12, False, False, "Eixample clásico, piso señorial reformado. Compañeros profesionales establecidos."),
-    ("Hab. con balcón en Poblenou",              "Poblenou",                 600, 3, 1, 9,  False, False, "Balcón propio. Zona tech en auge. Compañeros del sector digital y creativo."),
-    ("Hab. reformada en Sant Martí",             "Sant Martí",               610, 3, 1, 12, False, False, "Piso reformado completamente en 2023. Compañeros profesionales estables."),
-    ("Hab. exclusiva Barceloneta",               "Barceloneta",              620, 2, 1, 6,  False, False, "A 2 minutos de la playa. Piso para 2 personas. Silencioso y muy cuidado."),
-    ("Hab. en Esquerra Eixample premium",        "Esquerra de l'Eixample",   640, 3, 1, 12, False, False, "Gayxample. Comunidad tolerante y diversa. Muy bien equipado y luminoso."),
-    ("Hab. con mascotas en Gràcia",              "Gràcia",                   650, 3, 1, 9,  True,  False, "Mascotas bienvenidas. Piso muy cálido y acogedor. Compañeros amantes de los animales."),
-    ("Hab. en Sagrada Família premium",          "Sagrada Família",          660, 3, 1, 12, False, False, "Piso luminoso junto a la Sagrada Família. Muy turístico pero tranquilo por dentro."),
-    ("Hab. en Poblenou junto al mar",            "Poblenou",                 680, 3, 1, 12, False, False, "A 5 minutos a pie de la playa. Piso moderno con terraza compartida. Muy luminoso."),
-
-    # PREMIUM 700–950€ (Eixample, Sarrià, Les Corts)
-    ("Hab. premium en Eixample",                 "Eixample",                 700, 3, 1, 12, False, False, "Piso señorial en el Eixample. Techos altos, suelos hidráulicos. Compañeros profesionales."),
-    ("Hab. en Les Corts zona universitaria",     "Les Corts",                720, 3, 1, 12, False, False, "Cerca de la UB y hospitales. Ideal para médicos residentes o profesores. Muy tranquilo."),
-    ("Hab. luminosa en Sarrià",                  "Sarrià-Sant Gervasi",      750, 3, 1, 18, False, False, "Barrio residencial tranquilo. Piso cuidado con jardín privado. Compañeros profesionales."),
-    ("Hab. premium Les Corts",                   "Les Corts",                780, 2, 1, 18, False, False, "Piso para 2 personas, máxima privacidad. Zona premium tranquila y bien comunicada."),
-    ("Piso exclusivo en Sarrià",                 "Sarrià-Sant Gervasi",      820, 2, 1, 24, True,  False, "Jardín privado, zona de máxima tranquilidad. Mascotas bienvenidas. Solo adultos."),
-    ("Hab. en Dreta Eixample exclusiva",         "Dreta de l'Eixample",      840, 3, 1, 18, False, False, "Piso modernista reformado. Zona premium. Compañeros de perfil profesional alto."),
-    ("Hab. en Les Corts con piscina",            "Les Corts",                860, 4, 2, 12, False, False, "Edificio con piscina comunitaria. Zona tranquila cerca del Camp Nou."),
-    ("Piso de lujo en Sarrià-Sant Gervasi",      "Sarrià-Sant Gervasi",      900, 2, 1, 24, True,  False, "Zona alta de Barcelona. Jardín, garaje. Perfil ejecutivo o profesional senior."),
-    ("Hab. premium Eixample con terraza",        "Eixample",                 920, 3, 1, 18, False, False, "Terraza privada en el Eixample. Piso de alto standing. Solo larga estancia."),
-    ("Hab. en Sarrià top",                       "Sarrià-Sant Gervasi",      950, 2, 1, 24, True,  False, "El mejor piso del dataset. Jardín, terraza, zona residencial exclusiva. Todo incluido."),
+    ("Habitación asequible en Nou Barris",       "Nou Barris",               300, 4, 2, 3,  False, False, "Piso amplio y funcional. Buenas conexiones de metro. Ambiente estudiantil."),
+    ("Hab. tranquila en Horta-Guinardó",         "Horta-Guinardó",           310, 5, 3, 3,  False, True,  "Zona residencial tranquila. Cocina equipada, wifi incluido."),
+    ("Hab. en piso familiar Sant Andreu",        "Sant Andreu",              320, 4, 2, 6,  True,  False, "Piso amplio con terraza. Mascotas bienvenidas. Barrio tranquilo."),
+    ("Hab. económica en Sants",                  "Sants-Montjuïc",           330, 4, 2, 4,  False, False, "Muy bien comunicado con Sants Estació. Piso luminoso."),
+    ("Hab. piso estudiantes Clot",               "Clot",                     340, 5, 3, 4,  False, False, "Piso joven y social. Cerca de universidad y transporte."),
+    ("Hab. en Nou Barris reformada",             "Nou Barris",               360, 3, 1, 6,  False, False, "Piso reformado. Ascensor. Compañeros trabajadores tranquilos."),
+    ("Hab. con jardín en Horta",                 "Horta-Guinardó",           370, 4, 2, 6,  True,  False, "Jardín compartido. Barrio silencioso. Mascotas permitidas."),
+    ("Hab. en Sant Andreu norte",                "Sant Andreu",              380, 4, 1, 6,  False, False, "Zona tranquila con parques. Compañeros respetuosos."),
+    ("Hab. social en Vila de Gràcia",            "Vila de Gràcia",           410, 4, 2, 6,  False, False, "Piso muy social en Gràcia. Ambiente festivo y abierto."),
+    ("Hab. luminosa en Camp de l'Arpa",          "Camp de l'Arpa",           420, 3, 1, 6,  False, False, "Piso moderno. Buena comunidad de jóvenes profesionales."),
+    ("Hab. tranquila Sagrada Família",           "Sagrada Família",          430, 3, 1, 9,  False, False, "Piso silencioso, compañeros respetuosos. Cerca universidades."),
+    ("Hab. en Sant Pere céntrico",               "Sant Pere",                440, 4, 2, 6,  False, True,  "Zona histórica. Ambiente mixto joven. Fumadores en terraza."),
+    ("Hab. profesional en Sants",                "Sants-Montjuïc",           450, 3, 1, 12, False, False, "Compañeros trabajadores. Piso muy organizado."),
+    ("Hab. con encanto en El Born",              "El Born",                  460, 3, 1, 6,  False, False, "Techos altos. Compañeros creativos y abiertos."),
+    ("Hab. en Poblenou tecnológico",             "Poblenou",                 470, 4, 2, 9,  False, False, "Zona 22@. Ideal para sector tech. Ambiente dinámico."),
+    ("Hab. con terraza en Clot",                 "Clot",                     490, 3, 1, 9,  False, False, "Acceso a terraza privada. Compañeros jóvenes trabajadores."),
+    ("Hab. en Esquerra de l'Eixample",           "Esquerra de l'Eixample",   500, 4, 2, 9,  False, False, "Eixample izquierdo animado. Cerca bares y transporte."),
+    ("Hab. tranquila en Sant Martí",             "Sant Martí",               510, 3, 1, 12, False, False, "Barrio tranquilo. Compañeros profesionales organizados."),
+    ("Hab. cerca del mar Barceloneta",           "Barceloneta",              520, 3, 1, 3,  False, True,  "Cerca del mar. Ambiente veraniego. Estancias cortas."),
+    ("Hab. en Gràcia con carácter",              "Gràcia",                   530, 3, 1, 6,  False, False, "Piso acogedor. Comunidad mixta y abierta."),
+    ("Hab. moderna en Vila de Gràcia",           "Vila de Gràcia",           540, 3, 1, 9,  False, False, "Zona muy buscada. Piso tranquilo con buena convivencia."),
+    ("Hab. premium El Born",                     "El Born",                  560, 3, 1, 9,  False, False, "Techos originales, suelos de madera. Ambiente cultural."),
+    ("Hab. en Eixample derecho",                 "Dreta de l'Eixample",      580, 4, 2, 12, False, False, "Piso señorial reformado. Compañeros profesionales."),
+    ("Hab. con balcón en Poblenou",              "Poblenou",                 600, 3, 1, 9,  False, False, "Balcón propio. Zona tech. Compañeros del sector digital."),
+    ("Hab. reformada en Sant Martí",             "Sant Martí",               610, 3, 1, 12, False, False, "Reformado 2023. Compañeros profesionales estables."),
+    ("Hab. exclusiva Barceloneta",               "Barceloneta",              620, 2, 1, 6,  False, False, "A 2 minutos de la playa. Piso para 2 personas, muy cuidado."),
+    ("Hab. en Esquerra Eixample premium",        "Esquerra de l'Eixample",   640, 3, 1, 12, False, False, "Gayxample. Comunidad tolerante. Muy bien equipado."),
+    ("Hab. con mascotas en Gràcia",              "Gràcia",                   650, 3, 1, 9,  True,  False, "Mascotas bienvenidas. Piso cálido y acogedor."),
+    ("Hab. en Sagrada Família premium",          "Sagrada Família",          660, 3, 1, 12, False, False, "Piso luminoso junto a la Sagrada Família. Muy tranquilo."),
+    ("Hab. en Poblenou junto al mar",            "Poblenou",                 680, 3, 1, 12, False, False, "A 5 minutos de la playa. Terraza compartida. Luminoso."),
+    ("Hab. premium en Eixample",                 "Eixample",                 700, 3, 1, 12, False, False, "Piso señorial. Techos altos, suelos hidráulicos."),
+    ("Hab. en Les Corts zona universitaria",     "Les Corts",                720, 3, 1, 12, False, False, "Cerca UB y hospitales. Ideal médicos o investigadores."),
+    ("Hab. luminosa en Sarrià",                  "Sarrià-Sant Gervasi",      750, 3, 1, 18, False, False, "Barrio residencial tranquilo. Jardín privado."),
+    ("Hab. premium Les Corts",                   "Les Corts",                780, 2, 1, 18, False, False, "Máxima privacidad. Zona premium tranquila."),
+    ("Piso exclusivo en Sarrià",                 "Sarrià-Sant Gervasi",      820, 2, 1, 24, True,  False, "Jardín privado. Máxima tranquilidad. Solo adultos."),
+    ("Hab. en Dreta Eixample exclusiva",         "Dreta de l'Eixample",      840, 3, 1, 18, False, False, "Piso modernista reformado. Perfil profesional alto."),
+    ("Hab. en Les Corts con piscina",            "Les Corts",                860, 4, 2, 12, False, False, "Edificio con piscina comunitaria. Cerca del Camp Nou."),
+    ("Piso de lujo en Sarrià-Sant Gervasi",      "Sarrià-Sant Gervasi",      900, 2, 1, 24, True,  False, "Zona alta de Barcelona. Jardín, garaje. Perfil ejecutivo."),
+    ("Hab. premium Eixample con terraza",        "Eixample",                 920, 3, 1, 18, False, False, "Terraza privada en el Eixample. Alto standing."),
+    ("Hab. en Sarrià top",                       "Sarrià-Sant Gervasi",      950, 2, 1, 24, True,  False, "Jardín, terraza, zona exclusiva. Todo incluido."),
 ]
 
-# (listing_idx, estilo, ruido, horario, ocu_pref, edad_min, edad_max, dur_pref, num_conv, pref_genero, descripcion)
+# Convivientes por listing (1-3 por piso)
+# (nombre, edad, ocupacion, estilo, ruido, horario, genero, pref_genero, es_propietario, desc)
+ROOMMATES_BY_LISTING = {
+    0:  [("Arnau", 22, Ocupacion.ESTUDIANTE, EstiloConvivencia.SOCIAL, ToleranciaRuido.ALTA, Horario.NOCTURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, True, "Estudiante de ingeniería, me gusta el ambiente social pero respeto las normas."),
+         ("Irina", 21, Ocupacion.ESTUDIANTE, EstiloConvivencia.SOCIAL, ToleranciaRuido.ALTA, Horario.NOCTURNO, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, False, "Erasmus rusa, busco gente con quien salir y conocer la ciudad.")],
+    1:  [("Carles", 34, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, True, "Técnico de laboratorio, horarios fijos. Busco ambiente tranquilo.")],
+    2:  [("Mònica", 38, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, True, "Enfermera. Tengo dos gatos. Busco persona tranquila y amante de los animales."),
+         ("Bernat", 40, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.MEDIA, Horario.DIURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, False, "Arquitecto freelance. Trabajo desde casa algunos días.")],
+    3:  [("Júlia", 26, Ocupacion.TRABAJADOR, EstiloConvivencia.MIXTO, ToleranciaRuido.MEDIA, Horario.FLEXIBLE, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, True, "Trabajo en marketing digital. Horarios variables. Soy ordenada y limpia."),
+         ("Tomàs", 27, Ocupacion.FREELANCE, EstiloConvivencia.MIXTO, ToleranciaRuido.MEDIA, Horario.FLEXIBLE, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, False, "Diseñador gráfico. Trabajo desde casa. Tranquilo pero me gusta socializar.")],
+    4:  [("Laia", 20, Ocupacion.ESTUDIANTE, EstiloConvivencia.SOCIAL, ToleranciaRuido.ALTA, Horario.NOCTURNO, Genero.MUJER, PreferenciaGenero.MISMO_GENERO, True, "Estudiante de Bellas Artes. Me encanta el ambiente estudiantil y hacer planes."),
+         ("Sara", 21, Ocupacion.ESTUDIANTE, EstiloConvivencia.SOCIAL, ToleranciaRuido.ALTA, Horario.NOCTURNO, Genero.MUJER, PreferenciaGenero.MISMO_GENERO, False, "Estudiante de psicología. Sociable y positiva."),
+         ("Ona", 22, Ocupacion.ESTUDIANTE, EstiloConvivencia.SOCIAL, ToleranciaRuido.MEDIA, Horario.FLEXIBLE, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, False, "Estudiante de máster. Un poco más tranquila que mis compañeras pero me adapto.")],
+    5:  [("Gerard", 31, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, True, "Ingeniero civil. Trabajo exigente, en casa necesito tranquilidad.")],
+    6:  [("Núria", 29, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.MEDIA, Horario.DIURNO, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, True, "Veterinaria. Tengo un perro. Busco persona que ame los animales."),
+         ("David", 32, Ocupacion.FREELANCE, EstiloConvivencia.MIXTO, ToleranciaRuido.MEDIA, Horario.FLEXIBLE, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, False, "Fotógrafo freelance. Viajo mucho, cuando estoy en casa me gusta la tranquilidad.")],
+    7:  [("Ferran", 35, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, True, "Profesor universitario. Busco ambiente serio y respetuoso.")],
+    8:  [("Marta", 23, Ocupacion.ESTUDIANTE, EstiloConvivencia.SOCIAL, ToleranciaRuido.ALTA, Horario.NOCTURNO, Genero.MUJER, PreferenciaGenero.MIXTO, True, "Estudiante Erasmus italiana. Busco gente para conocer Barcelona."),
+         ("Pau", 24, Ocupacion.ESTUDIANTE, EstiloConvivencia.SOCIAL, ToleranciaRuido.MEDIA, Horario.FLEXIBLE, Genero.HOMBRE, PreferenciaGenero.MIXTO, False, "Estudiante de ADE. Me gusta el balance entre vida social y estudios.")],
+    9:  [("Elena", 27, Ocupacion.TRABAJADOR, EstiloConvivencia.MIXTO, ToleranciaRuido.MEDIA, Horario.DIURNO, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, True, "Trabaja en recursos humanos. Organizada y comunicativa."),
+         ("Marc", 28, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, False, "Contable. Rutinas muy fijas. Muy ordenado y tranquilo.")],
+    10: [("Irene", 30, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, True, "Abogada. Trabajo duro entre semana, necesito silencio en casa.")],
+    11: [("Guillem", 25, Ocupacion.ESTUDIANTE, EstiloConvivencia.SOCIAL, ToleranciaRuido.ALTA, Horario.NOCTURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, True, "Estudiante de música. Me gusta el ambiente bohemio del Born."),
+         ("Claudia", 24, Ocupacion.FREELANCE, EstiloConvivencia.MIXTO, ToleranciaRuido.MEDIA, Horario.FLEXIBLE, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, False, "Escritora freelance. Trabajo en cafeterías, en casa soy tranquila.")],
+    12: [("Roger", 33, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, True, "Técnico informático. Piso muy organizado, buscamos profesional serio.")],
+    13: [("Anna", 28, Ocupacion.FREELANCE, EstiloConvivencia.MIXTO, ToleranciaRuido.MEDIA, Horario.FLEXIBLE, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, True, "Ilustradora. El Born es mi barrio ideal, llevo 3 años aquí."),
+         ("Jordi", 30, Ocupacion.TRABAJADOR, EstiloConvivencia.SOCIAL, ToleranciaRuido.MEDIA, Horario.NOCTURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, False, "Trabaja en hostelería, llega tarde. Le gusta el ambiente animado.")],
+    14: [("Xavier", 29, Ocupacion.TRABAJADOR, EstiloConvivencia.MIXTO, ToleranciaRuido.MEDIA, Horario.DIURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, True, "Desarrollador de software. Trabajo en una startup del 22@."),
+         ("Celia", 27, Ocupacion.TRABAJADOR, EstiloConvivencia.MIXTO, ToleranciaRuido.MEDIA, Horario.FLEXIBLE, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, False, "Data scientist. También del sector tech. Horarios algo variables.")],
+    15: [("Ricard", 32, Ocupacion.FREELANCE, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, True, "Diseñador UX freelance. Trabajo desde casa, necesito tranquilidad.")],
+    16: [("Meritxell", 26, Ocupacion.TRABAJADOR, EstiloConvivencia.SOCIAL, ToleranciaRuido.MEDIA, Horario.FLEXIBLE, Genero.MUJER, PreferenciaGenero.MIXTO, True, "Trabaja en agencia de publicidad. Sociable, le gusta quedar con los compañeros."),
+         ("Abel", 25, Ocupacion.ESTUDIANTE, EstiloConvivencia.MIXTO, ToleranciaRuido.MEDIA, Horario.NOCTURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, False, "Estudiante de posgrado. Entre estudios y salidas de vez en cuando.")],
+    17: [("Patricia", 36, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, True, "Directora de proyectos. Busco compañero serio para larga estancia.")],
+    18: [("Bruno", 22, Ocupacion.ESTUDIANTE, EstiloConvivencia.SOCIAL, ToleranciaRuido.ALTA, Horario.NOCTURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, True, "Estudiante de Turismo. Me encanta la Barceloneta y el ambiente playero."),
+         ("Valentina", 23, Ocupacion.ESTUDIANTE, EstiloConvivencia.SOCIAL, ToleranciaRuido.ALTA, Horario.NOCTURNO, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, False, "Estudiante italiana. Aquí de intercambio, busco vivir la experiencia al máximo.")],
+    19: [("Àlex", 27, Ocupacion.FREELANCE, EstiloConvivencia.SOCIAL, ToleranciaRuido.MEDIA, Horario.FLEXIBLE, Genero.HOMBRE, PreferenciaGenero.MIXTO, True, "Músico y productor. Gràcia es mi barrio, llevo años aquí."),
+         ("Neus", 26, Ocupacion.TRABAJADOR, EstiloConvivencia.MIXTO, ToleranciaRuido.MEDIA, Horario.DIURNO, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, False, "Trabaja en una galería de arte. Tranquila pero disfruta del ambiente de Gràcia.")],
+    20: [("Vicenç", 31, Ocupacion.TRABAJADOR, EstiloConvivencia.MIXTO, ToleranciaRuido.MEDIA, Horario.FLEXIBLE, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, True, "Trabaja en banca. Ordenado y comunicativo.")],
+    21: [("Júlia", 29, Ocupacion.FREELANCE, EstiloConvivencia.MIXTO, ToleranciaRuido.MEDIA, Horario.FLEXIBLE, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, True, "Traductora literaria. El Born es mi inspiración diaria."),
+         ("Oriol", 31, Ocupacion.TRABAJADOR, EstiloConvivencia.SOCIAL, ToleranciaRuido.ALTA, Horario.NOCTURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, False, "Trabaja en un restaurante hasta tarde. Le encanta el ambiente del Born.")],
+    22: [("Cristina", 37, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, True, "Médica especialista. Vivo en el Eixample desde hace 5 años."),
+         ("Enric", 39, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, False, "Farmacéutico. Horarios regulares, vida tranquila.")],
+    23: [("Nil", 28, Ocupacion.FREELANCE, EstiloConvivencia.MIXTO, ToleranciaRuido.MEDIA, Horario.FLEXIBLE, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, True, "Full-stack developer. Trabajo desde casa, busco ambiente tech."),
+         ("Clàudia", 26, Ocupacion.TRABAJADOR, EstiloConvivencia.MIXTO, ToleranciaRuido.MEDIA, Horario.DIURNO, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, False, "Product manager en startup. También del mundo digital.")],
+    24: [("Miquel", 34, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, True, "Ingeniero industrial. Ordenado, tranquilo, busco lo mismo.")],
+    25: [("Rosa", 41, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, True, "Profesora de secundaria. Piso solo para 2, busco persona madura.")],
+    26: [("Héctor", 33, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, True, "Consultor de empresa. Viajo mucho, cuando estoy busco tranquilidad."),
+         ("Montse", 31, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.MEDIA, Horario.DIURNO, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, False, "Trabaja en RRHH. Muy organizada, le gusta el orden en casa.")],
+    27: [("Sílvia", 30, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, True, "Veterinaria. Tengo un gato. Solo personas que amen los animales.")],
+    28: [("Ignasi", 42, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, True, "Arquitecto senior. Busco ambiente serio y tranquilo para larga estancia."),
+         ("Carme", 38, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, False, "Trabaja en administración pública. Rutinas fijas, muy ordenada.")],
+    29: [("Llorenç", 35, Ocupacion.FREELANCE, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.FLEXIBLE, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, True, "Consultor autónomo. Vivo cerca del mar hace 3 años, no lo cambiaría.")],
+    30: [("Elisenda", 44, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, True, "Directora de departamento. Busco perfil profesional para el piso del Eixample."),
+         ("Andreu", 41, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, False, "Notario. Vida muy ordenada y tranquila.")],
+    31: [("Assumpta", 46, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, True, "Médica adjunta en el Hospital Clínic. Busco compañero del sector salud o similar.")],
+    32: [("Francesc", 50, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, True, "Empresario. Jardín privado. Solo adultos maduros y tranquilos.")],
+    33: [("Mercè", 48, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, True, "Gerente de empresa. Solo para 2 personas. Perfil muy seleccionado.")],
+    34: [("Josep", 55, Ocupacion.OTRO, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, True, "Jubilado. Zona alta exclusiva. Busco persona muy tranquila y respetuosa.")],
+    35: [("Victòria", 45, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, True, "Ejecutiva de banca. Eixample modernista. Perfil muy profesional."),
+         ("Lluís", 47, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, False, "Abogado. Rutinas muy fijas. Silencio absoluto en casa.")],
+    36: [("Gemma", 38, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, True, "Fisioterapeuta. Piscina en el edificio. Zona muy familiar."),
+         ("Albert", 40, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.MEDIA, Horario.DIURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, False, "Ingeniero agrónomo. Muy tranquilo y ordenado.")],
+    37: [("Pilar", 52, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, True, "Directora general. El piso más premium. Solo perfil muy senior.")],
+    38: [("Sergi", 40, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, True, "Director creativo. Terraza privada en el Eixample. Solo larga estancia."),
+         ("Noemí", 37, Ocupacion.FREELANCE, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.FLEXIBLE, Genero.MUJER, PreferenciaGenero.SIN_PREFERENCIA, False, "Arquitecta freelance. Trabaja desde casa algunos días, silencio necesario.")],
+    39: [("Joaquim", 58, Ocupacion.OTRO, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, True, "Inversor. El mejor piso del dataset. Solo adultos de perfil muy alto.")],
+}
+
 HOUSEHOLDS_RAW = [
-    (0,  EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  Ocupacion.ESTUDIANTE, 18,27, Duracion.CORTA,  3, PreferenciaGenero.SIN_PREFERENCIA, "Piso de estudiantes con buen ambiente. Buscamos alguien sociable y respetuoso."),
-    (1,  EstiloConvivencia.TRANQUILO, ToleranciaRuido.MEDIA, Horario.DIURNO,    None,                 20,35, Duracion.CORTA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Piso tranquilo. Buscamos persona ordenada y respetuosa con los espacios comunes."),
-    (2,  EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    Ocupacion.TRABAJADOR, 25,45, Duracion.MEDIA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Hogar familiar y acogedor. Buscamos persona estable y tranquila."),
-    (3,  EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  None,                 20,35, Duracion.CORTA,  3, PreferenciaGenero.SIN_PREFERENCIA, "Ambiente mixto y flexible. Buscamos persona limpia y comunicativa."),
-    (4,  EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  Ocupacion.ESTUDIANTE, 18,26, Duracion.CORTA,  4, PreferenciaGenero.MIXTO,           "Piso universitario muy social. Fiestas ocasionales entre semana."),
-    (5,  EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    Ocupacion.TRABAJADOR, 25,40, Duracion.MEDIA,  1, PreferenciaGenero.SIN_PREFERENCIA, "Piso solo para 2. Buscamos profesional tranquilo y ordenado."),
-    (6,  EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    None,                 28,50, Duracion.MEDIA,  1, PreferenciaGenero.SIN_PREFERENCIA, "Persona mayor de 28 bienvenida. Piso tranquilo y ordenado."),
-    (7,  EstiloConvivencia.TRANQUILO, ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  None,                 22,40, Duracion.MEDIA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Piso con jardín, muy tranquilo. Aceptamos mascotas."),
-    (8,  EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  None,                 18,30, Duracion.MEDIA,  2, PreferenciaGenero.MIXTO,           "Ambiente muy social y abierto. Buscamos persona extrovertida y sociable."),
-    (9,  EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  None,                 20,35, Duracion.MEDIA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Piso joven y profesional. Buscamos alguien limpio y comunicativo."),
-    (10, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    None,                 22,35, Duracion.MEDIA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Ambiente silencioso. Ideal para quien necesita concentración."),
-    (11, EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  None,                 18,30, Duracion.CORTA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Zona céntrica y animada. Piso social cerca de bares y restaurantes."),
-    (12, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    Ocupacion.TRABAJADOR, 25,45, Duracion.LARGA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Buscamos profesional estable para larga estancia. Piso muy organizado."),
-    (13, EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  None,                 20,35, Duracion.MEDIA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Ambiente creativo y abierto. Artistas y freelances bienvenidos."),
-    (14, EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  Ocupacion.TRABAJADOR, 22,38, Duracion.MEDIA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Piso tech en Poblenou. Buscamos perfil profesional del sector digital."),
-    (15, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    None,                 23,40, Duracion.MEDIA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Piso con terraza. Ambiente tranquilo y organizado."),
-    (16, EstiloConvivencia.SOCIAL,    ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  None,                 20,35, Duracion.MEDIA,  2, PreferenciaGenero.MIXTO,           "Zona animada del Eixample. Piso mixto y abierto."),
-    (17, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    Ocupacion.TRABAJADOR, 25,45, Duracion.LARGA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Piso profesional. Solo larga estancia. Compañeros estables y tranquilos."),
-    (18, EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  None,                 18,30, Duracion.CORTA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Cerca del mar. Ambiente festivo y relajado."),
-    (19, EstiloConvivencia.SOCIAL,    ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  None,                 20,32, Duracion.MEDIA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Piso de Gràcia con mucho carácter. Ambiente cultural y bohemio."),
-    (20, EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  None,                 20,35, Duracion.MEDIA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Piso moderno en Vila de Gràcia. Buscamos persona comunicativa."),
-    (21, EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  None,                 20,35, Duracion.MEDIA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Born histórico. Ambiente cultural y artístico. Techos altos."),
-    (22, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    Ocupacion.TRABAJADOR, 25,42, Duracion.LARGA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Eixample clásico. Buscamos profesional para larga estancia."),
-    (23, EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  Ocupacion.FREELANCE,  24,38, Duracion.MEDIA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Zona digital de Poblenou. Ideal para freelances y perfiles tech."),
-    (24, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    Ocupacion.TRABAJADOR, 26,45, Duracion.LARGA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Piso reformado. Solo larga estancia. Ambiente muy tranquilo."),
-    (25, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    None,                 28,50, Duracion.MEDIA,  1, PreferenciaGenero.SIN_PREFERENCIA, "Solo 2 personas. Máxima privacidad cerca del mar."),
-    (26, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    Ocupacion.TRABAJADOR, 25,40, Duracion.LARGA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Eixample izquierdo premium. Comunidad profesional estable."),
-    (27, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    None,                 25,45, Duracion.MEDIA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Mascotas bienvenidas. Piso cálido y familiar en Gràcia."),
-    (28, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    Ocupacion.TRABAJADOR, 28,50, Duracion.LARGA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Zona Sagrada Família. Piso luminoso y tranquilo."),
-    (29, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    None,                 26,45, Duracion.LARGA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Cerca de la playa. Piso moderno con terraza. Solo larga estancia."),
-    (30, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    Ocupacion.TRABAJADOR, 28,50, Duracion.LARGA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Eixample señorial. Compañeros profesionales de perfil alto."),
-    (31, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    None,                 25,45, Duracion.LARGA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Zona universitaria y hospitalaria. Ideal para médicos o investigadores."),
-    (32, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    None,                 28,55, Duracion.LARGA,  1, PreferenciaGenero.SIN_PREFERENCIA, "Sarrià tranquilo con jardín. Solo adultos. Larga estancia."),
-    (33, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    Ocupacion.TRABAJADOR, 30,55, Duracion.LARGA,  1, PreferenciaGenero.SIN_PREFERENCIA, "Solo 2 personas. Piso premium y tranquilo. Perfil profesional."),
-    (34, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    None,                 30,65, Duracion.LARGA,  1, PreferenciaGenero.SIN_PREFERENCIA, "Zona alta exclusiva. Solo adultos mayores de 30. Máxima tranquilidad."),
-    (35, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    Ocupacion.TRABAJADOR, 28,50, Duracion.LARGA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Eixample modernista. Piso de alto standing. Perfil ejecutivo."),
-    (36, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    None,                 25,50, Duracion.LARGA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Les Corts con piscina comunitaria. Zona muy tranquila y familiar."),
-    (37, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    None,                 32,65, Duracion.LARGA,  1, PreferenciaGenero.SIN_PREFERENCIA, "El mejor piso. Jardín, terraza. Perfil ejecutivo o profesional senior."),
-    (38, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    Ocupacion.TRABAJADOR, 28,50, Duracion.LARGA,  2, PreferenciaGenero.SIN_PREFERENCIA, "Terraza privada en Eixample. Solo larga estancia. Alto standing."),
-    (39, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    None,                 30,65, Duracion.LARGA,  1, PreferenciaGenero.SIN_PREFERENCIA, "Sarrià exclusivo. Jardín, garaje. El piso más premium del sistema."),
+    (0,  Duracion.CORTA,  18, 28, Ocupacion.ESTUDIANTE, "Piso universitario. Buscamos estudiante o joven trabajador."),
+    (1,  Duracion.CORTA,  22, 40, None,                 "Piso tranquilo. Persona ordenada y respetuosa."),
+    (2,  Duracion.MEDIA,  25, 50, Ocupacion.TRABAJADOR, "Hogar familiar. Persona estable y tranquila con mascotas."),
+    (3,  Duracion.CORTA,  20, 35, None,                 "Ambiente mixto. Persona limpia y comunicativa."),
+    (4,  Duracion.CORTA,  18, 26, Ocupacion.ESTUDIANTE, "Piso de chicas universitarias. Solo mujeres estudiantes."),
+    (5,  Duracion.MEDIA,  25, 42, Ocupacion.TRABAJADOR, "Piso profesional serio. Solo larga o media estancia."),
+    (6,  Duracion.MEDIA,  22, 45, None,                 "Hogar tranquilo con mascotas. Persona amante de los animales."),
+    (7,  Duracion.MEDIA,  28, 50, Ocupacion.TRABAJADOR, "Ambiente académico. Buscamos perfil profesional o investigador."),
+    (8,  Duracion.MEDIA,  18, 30, None,                 "Ambiente internacional y social. Cualquier perfil bienvenido."),
+    (9,  Duracion.MEDIA,  22, 38, None,                 "Piso joven profesional. Persona organizada y comunicativa."),
+    (10, Duracion.LARGA,  24, 40, Ocupacion.TRABAJADOR, "Solo larga estancia. Profesional que valore el silencio."),
+    (11, Duracion.MEDIA,  20, 35, None,                 "Ambiente creativo. Artistas y freelances bienvenidos."),
+    (12, Duracion.LARGA,  26, 45, Ocupacion.TRABAJADOR, "Piso muy organizado. Solo profesionales serios."),
+    (13, Duracion.MEDIA,  22, 38, None,                 "Born histórico. Ambiente cultural y artístico."),
+    (14, Duracion.MEDIA,  24, 40, Ocupacion.TRABAJADOR, "Zona 22@. Perfil tech o digital."),
+    (15, Duracion.MEDIA,  25, 42, None,                 "Piso tranquilo. Persona que valore el silencio."),
+    (16, Duracion.MEDIA,  20, 35, None,                 "Eixample animado. Perfil social o mixto."),
+    (17, Duracion.LARGA,  28, 50, Ocupacion.TRABAJADOR, "Solo larga estancia. Profesional estable."),
+    (18, Duracion.CORTA,  18, 30, None,                 "Cerca del mar. Ambiente festivo y relajado."),
+    (19, Duracion.MEDIA,  22, 35, None,                 "Gràcia bohemia. Ambiente cultural y musical."),
+    (20, Duracion.MEDIA,  22, 38, None,                 "Vila de Gràcia. Persona comunicativa y organizada."),
+    (21, Duracion.MEDIA,  22, 38, None,                 "Born artístico. Ambiente cultural y nocturno."),
+    (22, Duracion.LARGA,  28, 50, Ocupacion.TRABAJADOR, "Eixample clásico. Profesional para larga estancia."),
+    (23, Duracion.MEDIA,  24, 40, Ocupacion.FREELANCE,  "Poblenou digital. Perfil tech o creativo."),
+    (24, Duracion.LARGA,  28, 48, Ocupacion.TRABAJADOR, "Solo larga estancia. Ambiente muy tranquilo."),
+    (25, Duracion.MEDIA,  30, 55, None,                 "Solo 2 personas. Perfil maduro cerca del mar."),
+    (26, Duracion.LARGA,  28, 45, Ocupacion.TRABAJADOR, "Eixample premium. Profesional estable."),
+    (27, Duracion.MEDIA,  24, 45, None,                 "Gràcia con mascotas. Amante de los animales."),
+    (28, Duracion.LARGA,  30, 55, Ocupacion.TRABAJADOR, "Sagrada Família. Perfil serio para larga estancia."),
+    (29, Duracion.LARGA,  28, 48, None,                 "Poblenou mar. Solo larga estancia."),
+    (30, Duracion.LARGA,  32, 55, Ocupacion.TRABAJADOR, "Eixample señorial. Perfil muy profesional."),
+    (31, Duracion.LARGA,  28, 55, None,                 "Les Corts universitaria. Sector salud preferido."),
+    (32, Duracion.LARGA,  32, 65, None,                 "Sarrià exclusivo. Solo adultos muy tranquilos."),
+    (33, Duracion.LARGA,  35, 60, Ocupacion.TRABAJADOR, "Les Corts premium. Perfil muy seleccionado."),
+    (34, Duracion.LARGA,  35, 70, None,                 "Sarrià top. Persona muy mayor y tranquila."),
+    (35, Duracion.LARGA,  35, 55, Ocupacion.TRABAJADOR, "Eixample modernista. Perfil ejecutivo."),
+    (36, Duracion.LARGA,  28, 55, None,                 "Les Corts con piscina. Ambiente familiar."),
+    (37, Duracion.LARGA,  38, 70, None,                 "Sarrià lujo. Solo perfil senior muy seleccionado."),
+    (38, Duracion.LARGA,  30, 52, Ocupacion.TRABAJADOR, "Eixample terraza. Solo larga estancia."),
+    (39, Duracion.LARGA,  35, 70, None,                 "Sarrià top exclusivo. Perfil muy alto."),
 ]
 
-# Candidatos sintéticos
 CANDIDATES_RAW = [
-    ("Laura Gómez",    23, Ocupacion.ESTUDIANTE, 420,  ["Gràcia","Vila de Gràcia"],          9,  EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  False, False, PreferenciaGenero.MIXTO),
-    ("Marc Puig",      28, Ocupacion.TRABAJADOR, 750,  ["Eixample","Dreta de l'Eixample"],   18, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    False, False, PreferenciaGenero.SIN_PREFERENCIA),
-    ("Sofía Martín",   21, Ocupacion.ESTUDIANTE, 380,  ["Nou Barris","Horta-Guinardó"],       4,  EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  False, True,  PreferenciaGenero.MISMO_GENERO),
-    ("Pau Ferrer",     32, Ocupacion.FREELANCE,  900,  ["Sarrià-Sant Gervasi","Les Corts"],  24, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.FLEXIBLE,  True,  False, PreferenciaGenero.SIN_PREFERENCIA),
-    ("Elena Torres",   26, Ocupacion.TRABAJADOR, 650,  ["Poblenou","Sant Martí"],            10, EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.DIURNO,    False, False, PreferenciaGenero.SIN_PREFERENCIA),
-    ("Jordi Casas",    24, Ocupacion.ESTUDIANTE, 450,  ["Gràcia","Camp de l'Arpa","Clot"],    8, EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.FLEXIBLE,  False, False, PreferenciaGenero.MIXTO),
-    ("Ana Ruiz",       35, Ocupacion.TRABAJADOR, 820,  ["Les Corts","Sarrià-Sant Gervasi"],  24, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    False, False, PreferenciaGenero.SIN_PREFERENCIA),
-    ("David López",    29, Ocupacion.FREELANCE,  700,  ["Eixample","Poblenou"],              18, EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  True,  False, PreferenciaGenero.SIN_PREFERENCIA),
-    ("Marta Vidal",    22, Ocupacion.ESTUDIANTE, 350,  ["Horta-Guinardó","Nou Barris"],       9, EstiloConvivencia.TRANQUILO, ToleranciaRuido.MEDIA, Horario.DIURNO,    False, False, PreferenciaGenero.MISMO_GENERO),
-    ("Carlos Sánchez", 31, Ocupacion.TRABAJADOR, 680,  ["Sant Martí","Poblenou"],            24, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    False, False, PreferenciaGenero.SIN_PREFERENCIA),
-    ("Núria Mas",      20, Ocupacion.ESTUDIANTE, 330,  ["Nou Barris","Horta-Guinardó"],       4, EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  False, False, PreferenciaGenero.MISMO_GENERO),
-    ("Tomàs Roca",     27, Ocupacion.FREELANCE,  580,  ["El Born","Barceloneta","Sant Pere"],10, EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  False, False, PreferenciaGenero.SIN_PREFERENCIA),
-    ("Irene Blanco",   33, Ocupacion.TRABAJADOR, 780,  ["Eixample","Esquerra de l'Eixample"],24,EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    False, False, PreferenciaGenero.SIN_PREFERENCIA),
-    ("Guillem Font",   25, Ocupacion.ESTUDIANTE, 480,  ["Sant Pere","El Born"],               6, EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  False, True,  PreferenciaGenero.SIN_PREFERENCIA),
-    ("Rosa Jiménez",   40, Ocupacion.TRABAJADOR, 950,  ["Sarrià-Sant Gervasi","Les Corts"],  36, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    True,  False, PreferenciaGenero.SIN_PREFERENCIA),
-    ("Andreu Sala",    23, Ocupacion.ESTUDIANTE, 400,  ["Horta-Guinardó","Nou Barris","Clot"],8, EstiloConvivencia.SOCIAL,    ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  False, False, PreferenciaGenero.SIN_PREFERENCIA),
-    ("Pilar Moreno",   38, Ocupacion.TRABAJADOR, 870,  ["Les Corts","Eixample"],             24, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    False, False, PreferenciaGenero.SIN_PREFERENCIA),
-    ("Xavier Pons",    26, Ocupacion.FREELANCE,  620,  ["Poblenou","Clot","Sant Martí"],     12, EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  False, False, PreferenciaGenero.SIN_PREFERENCIA),
-    ("Claudia Rey",    21, Ocupacion.ESTUDIANTE, 360,  ["Nou Barris","Horta-Guinardó"],       5, EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  False, False, PreferenciaGenero.MISMO_GENERO),
-    ("Miquel Serra",   30, Ocupacion.TRABAJADOR, 700,  ["Sant Andreu","Clot","Sant Martí"],  18, EstiloConvivencia.TRANQUILO, ToleranciaRuido.MEDIA, Horario.DIURNO,    False, False, PreferenciaGenero.SIN_PREFERENCIA),
-    ("Laia Montserrat",24, Ocupacion.ESTUDIANTE, 460,  ["El Born","Barceloneta","Sant Pere"], 9, EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  False, True,  PreferenciaGenero.MISMO_GENERO),
-    ("Roger Expósito", 29, Ocupacion.FREELANCE,  720,  ["Eixample","Poblenou"],              18, EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  True,  False, PreferenciaGenero.SIN_PREFERENCIA),
-    ("Carme Solà",     36, Ocupacion.TRABAJADOR, 850,  ["Sarrià-Sant Gervasi","Gràcia"],     36, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    True,  False, PreferenciaGenero.SIN_PREFERENCIA),
-    ("Biel Nadal",     22, Ocupacion.ESTUDIANTE, 390,  ["Camp de l'Arpa","Clot","Nou Barris"],5, EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  False, False, PreferenciaGenero.SIN_PREFERENCIA),
-    ("Sara Pedraza",   27, Ocupacion.TRABAJADOR, 600,  ["Poblenou","Sant Martí"],            12, EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.DIURNO,    False, False, PreferenciaGenero.SIN_PREFERENCIA),
-    ("Arnau Esteve",   31, Ocupacion.FREELANCE,  750,  ["Gràcia","Eixample","Poblenou"],     18, EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  False, False, PreferenciaGenero.SIN_PREFERENCIA),
-    ("Montse Herrero", 44, Ocupacion.TRABAJADOR, 950,  ["Sarrià-Sant Gervasi","Les Corts"],  36, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    True,  False, PreferenciaGenero.SIN_PREFERENCIA),
-    ("Pol Oliveras",   20, Ocupacion.ESTUDIANTE, 310,  ["Nou Barris","Horta-Guinardó"],       4, EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  False, False, PreferenciaGenero.SIN_PREFERENCIA),
-    ("Júlia Campà",    25, Ocupacion.ESTUDIANTE, 500,  ["Barceloneta","El Born","Gràcia"],    9, EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  False, False, PreferenciaGenero.MISMO_GENERO),
-    ("Ferran Coll",    34, Ocupacion.TRABAJADOR, 800,  ["Sant Andreu","Clot","Sant Martí"],  24, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    False, False, PreferenciaGenero.SIN_PREFERENCIA),
+    ("Laura Gómez",    23, Ocupacion.ESTUDIANTE, 420,  ["Gràcia","Vila de Gràcia"],          9,  EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  False, False, Genero.MUJER,          PreferenciaGenero.MIXTO),
+    ("Marc Puig",      28, Ocupacion.TRABAJADOR, 750,  ["Eixample","Dreta de l'Eixample"],   18, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    False, False, Genero.HOMBRE,         PreferenciaGenero.SIN_PREFERENCIA),
+    ("Sofía Martín",   21, Ocupacion.ESTUDIANTE, 380,  ["Nou Barris","Horta-Guinardó"],       4,  EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  False, True,  Genero.MUJER,          PreferenciaGenero.MISMO_GENERO),
+    ("Pau Ferrer",     32, Ocupacion.FREELANCE,  900,  ["Sarrià-Sant Gervasi","Les Corts"],  24, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.FLEXIBLE,  True,  False, Genero.HOMBRE,         PreferenciaGenero.SIN_PREFERENCIA),
+    ("Elena Torres",   26, Ocupacion.TRABAJADOR, 650,  ["Poblenou","Sant Martí"],            10, EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.DIURNO,    False, False, Genero.MUJER,          PreferenciaGenero.SIN_PREFERENCIA),
+    ("Jordi Casas",    24, Ocupacion.ESTUDIANTE, 450,  ["Gràcia","Camp de l'Arpa","Clot"],    8, EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.FLEXIBLE,  False, False, Genero.HOMBRE,         PreferenciaGenero.MIXTO),
+    ("Ana Ruiz",       35, Ocupacion.TRABAJADOR, 820,  ["Les Corts","Sarrià-Sant Gervasi"],  24, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    False, False, Genero.MUJER,          PreferenciaGenero.SIN_PREFERENCIA),
+    ("David López",    29, Ocupacion.FREELANCE,  700,  ["Eixample","Poblenou"],              18, EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  True,  False, Genero.HOMBRE,         PreferenciaGenero.SIN_PREFERENCIA),
+    ("Marta Vidal",    22, Ocupacion.ESTUDIANTE, 350,  ["Horta-Guinardó","Nou Barris"],       9, EstiloConvivencia.TRANQUILO, ToleranciaRuido.MEDIA, Horario.DIURNO,    False, False, Genero.MUJER,          PreferenciaGenero.MISMO_GENERO),
+    ("Carlos Sánchez", 31, Ocupacion.TRABAJADOR, 680,  ["Sant Martí","Poblenou"],            24, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    False, False, Genero.HOMBRE,         PreferenciaGenero.SIN_PREFERENCIA),
+    ("Núria Mas",      20, Ocupacion.ESTUDIANTE, 330,  ["Nou Barris","Horta-Guinardó"],       4, EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  False, False, Genero.MUJER,          PreferenciaGenero.MISMO_GENERO),
+    ("Tomàs Roca",     27, Ocupacion.FREELANCE,  580,  ["El Born","Barceloneta","Sant Pere"],10, EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  False, False, Genero.HOMBRE,         PreferenciaGenero.SIN_PREFERENCIA),
+    ("Irene Blanco",   33, Ocupacion.TRABAJADOR, 780,  ["Eixample","Esquerra de l'Eixample"],24, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    False, False, Genero.MUJER,          PreferenciaGenero.SIN_PREFERENCIA),
+    ("Guillem Font",   25, Ocupacion.ESTUDIANTE, 480,  ["Sant Pere","El Born"],               6, EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  False, True,  Genero.HOMBRE,         PreferenciaGenero.SIN_PREFERENCIA),
+    ("Rosa Jiménez",   40, Ocupacion.TRABAJADOR, 950,  ["Sarrià-Sant Gervasi","Les Corts"],  36, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    True,  False, Genero.MUJER,          PreferenciaGenero.SIN_PREFERENCIA),
+    ("Andreu Sala",    23, Ocupacion.ESTUDIANTE, 400,  ["Horta-Guinardó","Nou Barris","Clot"],8, EstiloConvivencia.SOCIAL,    ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  False, False, Genero.HOMBRE,         PreferenciaGenero.SIN_PREFERENCIA),
+    ("Xavier Pons",    26, Ocupacion.FREELANCE,  620,  ["Poblenou","Clot","Sant Martí"],     12, EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  False, False, Genero.HOMBRE,         PreferenciaGenero.SIN_PREFERENCIA),
+    ("Claudia Rey",    21, Ocupacion.ESTUDIANTE, 360,  ["Nou Barris","Horta-Guinardó"],       5, EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  False, False, Genero.MUJER,          PreferenciaGenero.MISMO_GENERO),
+    ("Sara Pedraza",   27, Ocupacion.TRABAJADOR, 600,  ["Poblenou","Sant Martí"],            12, EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.DIURNO,    False, False, Genero.MUJER,          PreferenciaGenero.SIN_PREFERENCIA),
+    ("Arnau Esteve",   31, Ocupacion.FREELANCE,  750,  ["Gràcia","Eixample","Poblenou"],     18, EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  False, False, Genero.HOMBRE,         PreferenciaGenero.SIN_PREFERENCIA),
+    ("Montse Herrero", 44, Ocupacion.TRABAJADOR, 950,  ["Sarrià-Sant Gervasi","Les Corts"],  36, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    True,  False, Genero.MUJER,          PreferenciaGenero.SIN_PREFERENCIA),
+    ("Pol Oliveras",   20, Ocupacion.ESTUDIANTE, 310,  ["Nou Barris","Horta-Guinardó"],       4, EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  False, False, Genero.HOMBRE,         PreferenciaGenero.SIN_PREFERENCIA),
+    ("Júlia Campà",    25, Ocupacion.ESTUDIANTE, 500,  ["Barceloneta","El Born","Gràcia"],    9, EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  False, False, Genero.MUJER,          PreferenciaGenero.MISMO_GENERO),
+    ("Ferran Coll",    34, Ocupacion.TRABAJADOR, 800,  ["Sant Andreu","Clot","Sant Martí"],  24, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    False, False, Genero.HOMBRE,         PreferenciaGenero.SIN_PREFERENCIA),
+    ("Miquel Serra",   30, Ocupacion.TRABAJADOR, 700,  ["Sant Andreu","Clot","Sant Martí"],  18, EstiloConvivencia.TRANQUILO, ToleranciaRuido.MEDIA, Horario.DIURNO,    False, False, Genero.HOMBRE,         PreferenciaGenero.SIN_PREFERENCIA),
+    ("Laia Montserrat",24, Ocupacion.ESTUDIANTE, 460,  ["El Born","Barceloneta","Sant Pere"], 9, EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  False, True,  Genero.MUJER,          PreferenciaGenero.MISMO_GENERO),
+    ("Carme Solà",     36, Ocupacion.TRABAJADOR, 850,  ["Sarrià-Sant Gervasi","Gràcia"],     36, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    True,  False, Genero.MUJER,          PreferenciaGenero.SIN_PREFERENCIA),
+    ("Biel Nadal",     22, Ocupacion.ESTUDIANTE, 390,  ["Camp de l'Arpa","Clot","Nou Barris"],5, EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  False, False, Genero.HOMBRE,         PreferenciaGenero.SIN_PREFERENCIA),
+    ("Roger Expósito", 29, Ocupacion.FREELANCE,  800,  ["Eixample","Poblenou"],              18, EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  True,  False, Genero.HOMBRE,         PreferenciaGenero.SIN_PREFERENCIA),
+    ("Pilar Moreno",   38, Ocupacion.TRABAJADOR, 870,  ["Les Corts","Eixample"],             24, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    False, False, Genero.MUJER,          PreferenciaGenero.SIN_PREFERENCIA),
 ]
 
 
 def populate_database():
     init_db()
     conn = get_connection()
-    conn.execute("DELETE FROM households"); conn.execute("DELETE FROM listings")
-    conn.execute("DELETE FROM candidates")
-    try: conn.execute("DELETE FROM sqlite_sequence WHERE name IN ('households','listings','candidates')")
+    for tbl in ["roommates","households","listings","candidates"]:
+        conn.execute(f"DELETE FROM {tbl}")
+    try:
+        conn.execute("DELETE FROM sqlite_sequence WHERE name IN ('roommates','households','listings','candidates')")
     except: pass
     conn.commit(); conn.close()
 
@@ -154,25 +215,32 @@ def populate_database():
             descripcion=desc)
         listing_ids.append(insert_listing(l))
 
-    for idx, estilo, ruido, horario, ocu, emin, emax, dur, nconv, pgen, desc in HOUSEHOLDS_RAW:
-        hh = Household(id=0, listing_id=listing_ids[idx], estilo_convivencia=estilo,
-            tolerancia_ruido=ruido, horario_predominante=horario,
-            perfil_buscado_ocupacion=ocu, perfil_buscado_edad_min=emin,
-            perfil_buscado_edad_max=emax, duracion_preferida=dur,
-            num_convivientes_actuales=nconv, preferencia_genero=pgen, descripcion=desc)
+    for idx, dur_pref, emin, emax, ocu, desc in HOUSEHOLDS_RAW:
+        hh = Household(id=0, listing_id=listing_ids[idx], duracion_preferida=dur_pref,
+            perfil_buscado_edad_min=emin, perfil_buscado_edad_max=emax,
+            perfil_buscado_ocupacion=ocu, descripcion=desc)
         insert_household(hh)
 
-    for nombre, edad, ocu, presup, barrios, meses, estilo, ruido, horario, mascotas, fumador, pgen in CANDIDATES_RAW:
+    for idx, roommates_data in ROOMMATES_BY_LISTING.items():
+        lid = listing_ids[idx]
+        for nombre, edad, ocu, estilo, ruido, horario, genero, pgen, es_prop, desc in roommates_data:
+            rm = Roommate(id=0, listing_id=lid, nombre=nombre, edad=edad,
+                ocupacion=ocu, estilo_convivencia=estilo, tolerancia_ruido=ruido,
+                horario=horario, genero=genero, preferencia_genero=pgen,
+                es_propietario=es_prop, descripcion=desc)
+            insert_roommate(rm)
+
+    for nombre, edad, ocu, presup, barrios, meses, estilo, ruido, horario, mascotas, fumador, genero, pgen in CANDIDATES_RAW:
         dur = meses_a_duracion(meses)
         c = Candidate(id=0, nombre=nombre, edad=edad, ocupacion=ocu,
             presupuesto_max=presup, barrios_preferidos=barrios,
             meses_estancia=meses, duracion_deseada=dur, estilo_convivencia=estilo,
             tolerancia_ruido=ruido, horario=horario, acepta_mascotas=mascotas,
-            fumador=fumador, preferencia_genero=pgen, descripcion="")
+            fumador=fumador, genero=genero, preferencia_genero=pgen, descripcion="")
         insert_candidate(c)
 
-    print(f"Dataset v3: {len(LISTINGS_RAW)} pisos, {len(HOUSEHOLDS_RAW)} hogares, {len(CANDIDATES_RAW)} candidatos.")
-
+    rm_total = sum(len(v) for v in ROOMMATES_BY_LISTING.values())
+    print(f"Dataset v4: {len(LISTINGS_RAW)} pisos, {len(HOUSEHOLDS_RAW)} hogares, {rm_total} convivientes, {len(CANDIDATES_RAW)} candidatos.")
 
 if __name__ == "__main__":
     populate_database()

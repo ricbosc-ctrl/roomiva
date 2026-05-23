@@ -1,6 +1,6 @@
-"""Modelos de datos v3 — sin tipo habitación, con preferencia género."""
+"""Modelos de datos v4 — compatibilidad grupal con convivientes individuales."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional
 from enum import Enum
 
@@ -22,9 +22,9 @@ class ToleranciaRuido(str, Enum):
     ALTA = "alta"
 
 class Duracion(str, Enum):
-    CORTA = "corta"   # 3–6 meses
-    MEDIA = "media"   # 7–12 meses
-    LARGA = "larga"   # 13+ meses
+    CORTA = "corta"
+    MEDIA = "media"
+    LARGA = "larga"
 
 class Horario(str, Enum):
     DIURNO = "diurno"
@@ -74,7 +74,7 @@ class Candidate:
     horario: Horario
     acepta_mascotas: bool
     fumador: bool
-    genero: "Genero" = None
+    genero: Genero = Genero.NO_ESPECIFICAR
     preferencia_genero: PreferenciaGenero = PreferenciaGenero.SIN_PREFERENCIA
     descripcion: Optional[str] = None
 
@@ -87,8 +87,39 @@ class Candidate:
             "estilo_convivencia": self.estilo_convivencia.value,
             "tolerancia_ruido": self.tolerancia_ruido.value, "horario": self.horario.value,
             "acepta_mascotas": int(self.acepta_mascotas), "fumador": int(self.fumador),
-            "genero": self.genero.value if self.genero else "no_especificar",
+            "genero": self.genero.value,
             "preferencia_genero": self.preferencia_genero.value,
+            "descripcion": self.descripcion or "",
+        }
+
+
+@dataclass
+class Roommate:
+    """Perfil individual de un conviviente actual del hogar."""
+    id: int
+    listing_id: int
+    nombre: str
+    edad: int
+    ocupacion: Ocupacion
+    estilo_convivencia: EstiloConvivencia
+    tolerancia_ruido: ToleranciaRuido
+    horario: Horario
+    genero: Genero = Genero.NO_ESPECIFICAR
+    preferencia_genero: PreferenciaGenero = PreferenciaGenero.SIN_PREFERENCIA
+    es_propietario: bool = False
+    descripcion: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id, "listing_id": self.listing_id,
+            "nombre": self.nombre, "edad": self.edad,
+            "ocupacion": self.ocupacion.value,
+            "estilo_convivencia": self.estilo_convivencia.value,
+            "tolerancia_ruido": self.tolerancia_ruido.value,
+            "horario": self.horario.value,
+            "genero": self.genero.value,
+            "preferencia_genero": self.preferencia_genero.value,
+            "es_propietario": int(self.es_propietario),
             "descripcion": self.descripcion or "",
         }
 
@@ -120,31 +151,22 @@ class Listing:
 
 @dataclass
 class Household:
+    """Metadatos del hogar: duración preferida y perfil buscado en general."""
     id: int
     listing_id: int
-    estilo_convivencia: EstiloConvivencia
-    tolerancia_ruido: ToleranciaRuido
-    horario_predominante: Horario
-    perfil_buscado_ocupacion: Optional[Ocupacion]
-    perfil_buscado_edad_min: Optional[int]
-    perfil_buscado_edad_max: Optional[int]
     duracion_preferida: Duracion
-    num_convivientes_actuales: int
-    preferencia_genero: PreferenciaGenero = PreferenciaGenero.SIN_PREFERENCIA
+    perfil_buscado_edad_min: int = 18
+    perfil_buscado_edad_max: int = 99
+    perfil_buscado_ocupacion: Optional[Ocupacion] = None
     descripcion: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {
             "id": self.id, "listing_id": self.listing_id,
-            "estilo_convivencia": self.estilo_convivencia.value,
-            "tolerancia_ruido": self.tolerancia_ruido.value,
-            "horario_predominante": self.horario_predominante.value,
-            "perfil_buscado_ocupacion": self.perfil_buscado_ocupacion.value if self.perfil_buscado_ocupacion else "",
-            "perfil_buscado_edad_min": self.perfil_buscado_edad_min or 0,
-            "perfil_buscado_edad_max": self.perfil_buscado_edad_max or 99,
             "duracion_preferida": self.duracion_preferida.value,
-            "num_convivientes_actuales": self.num_convivientes_actuales,
-            "preferencia_genero": self.preferencia_genero.value,
+            "perfil_buscado_edad_min": self.perfil_buscado_edad_min,
+            "perfil_buscado_edad_max": self.perfil_buscado_edad_max,
+            "perfil_buscado_ocupacion": self.perfil_buscado_ocupacion.value if self.perfil_buscado_ocupacion else "",
             "descripcion": self.descripcion or "",
         }
 
@@ -161,15 +183,32 @@ class User:
 
 
 @dataclass
+class RoommateScore:
+    """Score de compatibilidad entre un candidato y un conviviente individual."""
+    roommate_id: int
+    roommate_nombre: str
+    score: float
+    detalle: dict
+    razones: List[str]
+    advertencias: List[str]
+
+    @property
+    def score_pct(self) -> int:
+        return round(self.score * 100)
+
+
+@dataclass
 class RecommendationResult:
     target_id: int
     target_nombre: str
-    score_total: float
-    score_detalle: dict
+    score_total: float           # score grupal agregado
+    score_detalle: dict          # scores por criterio (media de convivientes)
     razones: List[str]
     advertencias: List[str]
     hard_constraints_ok: bool
+    roommate_scores: List[RoommateScore] = field(default_factory=list)
     listing_info: Optional[dict] = None
+    aggregation_method: str = "mean"  # mean | min | weighted
 
     @property
     def score_pct(self) -> int:

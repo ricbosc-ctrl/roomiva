@@ -1,9 +1,9 @@
-"""API REST v3 — sirve frontend + endpoints."""
+"""API REST v4 — compatibilidad grupal."""
 
 import sys, os, secrets
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from fastapi import FastAPI, HTTPException, Depends, Header, Request
+from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -19,15 +19,13 @@ from database.db import (
     update_user_candidate, update_user_listing, verify_password,
     insert_candidate, get_all_candidates, get_candidate,
     insert_listing, get_all_listings, get_listing,
-    insert_household, get_all_households, get_household, get_household_by_listing,
-    save_feedback, get_feedback_count
+    insert_household, get_all_households, get_household_by_listing,
+    get_all_roommates, get_roommates_by_listing,
+    save_feedback, get_feedback_count, get_ml_weights
 )
-from engine.recommender import (
-    recommend_listings_for_candidate, recommend_candidates_for_household,
-    DEFAULT_WEIGHTS, get_active_weights
-)
+from engine.recommender import recommend_listings_for_candidate, DEFAULT_ALPHA
 
-app = FastAPI(title="Roomiva API v3", version="3.0.0")
+app = FastAPI(title="Roomiva API v4 — Group Compatibility", version="4.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 _sessions: dict = {}
@@ -42,7 +40,6 @@ def get_uid(x_token: Optional[str] = Header(default=None)) -> int:
 def startup():
     init_db()
 
-# ── SERVE FRONTEND ──
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 def serve_index():
     with open(_FRONTEND, encoding="utf-8") as f:
@@ -83,7 +80,7 @@ def me(uid: int = Depends(get_uid)):
     return {"user_id": user.id, "email": user.email, "rol": user.rol,
             "nombre": user.nombre, "candidate_id": user.candidate_id, "listing_id": user.listing_id}
 
-# ── PROFILES ──
+# ── PROFILE ──
 class CandidateProfileIn(BaseModel):
     edad: int; ocupacion: Ocupacion; presupuesto_max: float
     barrios_preferidos: List[str]; meses_estancia: int
@@ -114,49 +111,15 @@ def create_candidate_profile(data: CandidateProfileIn, uid: int = Depends(get_ui
     update_user_candidate(uid, cid)
     return {"candidate_id": cid, "duracion_categoria": duracion.value}
 
-class ListingProfileIn(BaseModel):
-    titulo: str; barrio: str; precio_mes: float
-    plazas_totales: int; plazas_disponibles: int; meses_minimos: int
-    permite_mascotas: bool = False; permite_fumar: bool = False
-    descripcion: Optional[str] = None
-    estilo_convivencia: EstiloConvivencia; tolerancia_ruido: ToleranciaRuido
-    horario_predominante: Horario; perfil_buscado_ocupacion: Optional[Ocupacion] = None
-    perfil_buscado_edad_min: int = 18; perfil_buscado_edad_max: int = 99
-    num_convivientes_actuales: int = 1
-    preferencia_genero: PreferenciaGenero = PreferenciaGenero.SIN_PREFERENCIA
-    descripcion_hogar: Optional[str] = None
-
-@app.post("/profile/listing", tags=["Profile"])
-def create_listing_profile(data: ListingProfileIn, uid: int = Depends(get_uid)):
-    user = get_user(uid)
-    if not user or user.rol != "propietario":
-        raise HTTPException(403, "Solo propietarios")
-    if data.barrio not in BARRIOS_BARCELONA:
-        raise HTTPException(400, f"Barrio desconocido: {data.barrio}")
-    if data.meses_minimos < 3:
-        raise HTTPException(400, "Mínimo 3 meses")
-    duracion = meses_a_duracion(data.meses_minimos)
-    listing = Listing(id=0, titulo=data.titulo, barrio=data.barrio, precio_mes=data.precio_mes,
-        plazas_totales=data.plazas_totales, plazas_disponibles=data.plazas_disponibles,
-        duracion_minima=duracion, meses_minimos=data.meses_minimos,
-        permite_mascotas=data.permite_mascotas, permite_fumar=data.permite_fumar,
-        descripcion=data.descripcion)
-    lid = insert_listing(listing)
-    hh = Household(id=0, listing_id=lid, estilo_convivencia=data.estilo_convivencia,
-        tolerancia_ruido=data.tolerancia_ruido, horario_predominante=data.horario_predominante,
-        perfil_buscado_ocupacion=data.perfil_buscado_ocupacion,
-        perfil_buscado_edad_min=data.perfil_buscado_edad_min,
-        perfil_buscado_edad_max=data.perfil_buscado_edad_max,
-        duracion_preferida=duracion, num_convivientes_actuales=data.num_convivientes_actuales,
-        preferencia_genero=data.preferencia_genero, descripcion=data.descripcion_hogar)
-    insert_household(hh)
-    update_user_listing(uid, lid)
-    return {"listing_id": lid, "duracion_categoria": duracion.value}
-
 # ── RECOMMENDATIONS ──
+class RoommateScoreOut(BaseModel):
+    roommate_id: int; roommate_nombre: str; score: float; score_pct: int
+    razones: List[str]; advertencias: List[str]
+
 class RecommendationOut(BaseModel):
     target_id: int; target_nombre: str; score_total: float; score_pct: int
     score_detalle: dict; razones: List[str]; advertencias: List[str]
+    roommate_scores: List[RoommateScoreOut]
     listing_info: Optional[dict] = None
 
 @app.get("/recommend/listings", tags=["Recommendations"], response_model=List[RecommendationOut])
@@ -165,29 +128,22 @@ def recommend_for_me(top_n: int = 15, uid: int = Depends(get_uid)):
     if not user or user.rol != "candidato" or not user.candidate_id:
         raise HTTPException(403, "Completa tu perfil primero")
     candidate = get_candidate(user.candidate_id)
-    results = recommend_listings_for_candidate(candidate, get_all_listings(), get_all_households(), top_n)
-    return [RecommendationOut(target_id=r.target_id, target_nombre=r.target_nombre,
-            score_total=r.score_total, score_pct=r.score_pct, score_detalle=r.score_detalle,
-            razones=r.razones, advertencias=r.advertencias, listing_info=r.listing_info)
-            for r in results]
-
-@app.get("/recommend/candidates", tags=["Recommendations"], response_model=List[RecommendationOut])
-def recommend_candidates_for_me(top_n: int = 15, uid: int = Depends(get_uid)):
-    user = get_user(uid)
-    if not user or user.rol != "propietario" or not user.listing_id:
-        raise HTTPException(403, "Completa tu perfil primero")
-    listing = get_listing(user.listing_id)
-    household = get_household_by_listing(user.listing_id)
-    if not household: raise HTTPException(404, "Hogar no encontrado")
-    results = recommend_candidates_for_household(household, listing, get_all_candidates(), top_n)
-    return [RecommendationOut(target_id=r.target_id, target_nombre=r.target_nombre,
-            score_total=r.score_total, score_pct=r.score_pct, score_detalle=r.score_detalle,
-            razones=r.razones, advertencias=r.advertencias, listing_info=r.listing_info)
-            for r in results]
+    results = recommend_listings_for_candidate(
+        candidate, get_all_listings(), get_all_households(), get_all_roommates(), top_n)
+    return [RecommendationOut(
+        target_id=r.target_id, target_nombre=r.target_nombre,
+        score_total=r.score_total, score_pct=r.score_pct,
+        score_detalle=r.score_detalle, razones=r.razones, advertencias=r.advertencias,
+        roommate_scores=[RoommateScoreOut(
+            roommate_id=rs.roommate_id, roommate_nombre=rs.roommate_nombre,
+            score=rs.score, score_pct=rs.score_pct,
+            razones=rs.razones, advertencias=rs.advertencias)
+            for rs in r.roommate_scores],
+        listing_info=r.listing_info) for r in results]
 
 # ── FEEDBACK ──
 class FeedbackIn(BaseModel):
-    listing_id: int; score_detalle: dict; valor: int
+    listing_id: int; scores: dict; valor: int
 
 @app.post("/feedback", tags=["Feedback"])
 def submit_feedback(data: FeedbackIn, uid: int = Depends(get_uid)):
@@ -196,14 +152,21 @@ def submit_feedback(data: FeedbackIn, uid: int = Depends(get_uid)):
         raise HTTPException(403, "Solo candidatos")
     if data.valor not in (0, 1):
         raise HTTPException(400, "valor debe ser 0 o 1")
-    save_feedback(uid, user.candidate_id, data.listing_id, data.score_detalle, data.valor)
+    save_feedback(uid, user.candidate_id, data.listing_id, data.scores, data.valor)
     return {"ok": True, "total_feedback": get_feedback_count()}
 
 @app.get("/feedback/stats", tags=["Feedback"])
 def feedback_stats():
     count = get_feedback_count()
-    return {"total_feedbacks": count, "modelo_activo": count >= 10,
-            "pesos_activos": get_active_weights(), "pesos_base": DEFAULT_WEIGHTS}
+    weights = get_ml_weights()
+    return {
+        "total_feedbacks": count,
+        "modelo_activo": count >= 10,
+        "alpha_actual": {k: weights[k] for k in ["alpha_mean","alpha_min","alpha_weighted"]},
+        "alpha_base": DEFAULT_ALPHA,
+        "precision_modelo": weights.get("accuracy", 0),
+        "muestras_entrenamiento": weights.get("sample_count", 0),
+    }
 
 # ── UTILS ──
 @app.get("/candidates/{cid}", tags=["Utils"])
@@ -218,13 +181,17 @@ def get_listing_ep(lid: int):
     if not l: raise HTTPException(404)
     return l.to_dict()
 
+@app.get("/listings/{lid}/roommates", tags=["Utils"])
+def get_listing_roommates(lid: int):
+    return [rm.to_dict() for rm in get_roommates_by_listing(lid)]
+
 @app.get("/barrios", tags=["Utils"])
 def get_barrios():
     return {"barrios": BARRIOS_BARCELONA}
 
 @app.get("/health", tags=["Utils"])
 def health():
-    return {"status": "ok", "version": "3.0.0", "feedback_count": get_feedback_count()}
+    return {"status": "ok", "version": "4.0.0", "feedback_count": get_feedback_count()}
 
 if __name__ == "__main__":
     import uvicorn

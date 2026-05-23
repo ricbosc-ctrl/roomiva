@@ -1,14 +1,14 @@
-"""Capa de persistencia SQLite v3 — sin tipo habitación."""
+"""Capa de persistencia SQLite v4 — compatibilidad grupal."""
 
 import sqlite3, os, hashlib
 from typing import List, Optional
 from models.models import (
-    Candidate, Listing, Household, User,
+    Candidate, Listing, Household, Roommate, User,
     Ocupacion, EstiloConvivencia, ToleranciaRuido, Duracion, Horario,
     PreferenciaGenero, Genero, meses_a_duracion
 )
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "coliving.db")
+DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "coliving.db"))
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
@@ -44,15 +44,26 @@ def init_db():
         );
         CREATE TABLE IF NOT EXISTS households (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            listing_id INTEGER NOT NULL,
-            estilo_convivencia TEXT NOT NULL, tolerancia_ruido TEXT NOT NULL,
-            horario_predominante TEXT NOT NULL,
-            perfil_buscado_ocupacion TEXT,
+            listing_id INTEGER NOT NULL UNIQUE,
+            duracion_preferida TEXT NOT NULL,
             perfil_buscado_edad_min INTEGER DEFAULT 18,
             perfil_buscado_edad_max INTEGER DEFAULT 99,
-            duracion_preferida TEXT NOT NULL,
-            num_convivientes_actuales INTEGER DEFAULT 1,
+            perfil_buscado_ocupacion TEXT DEFAULT '',
+            descripcion TEXT,
+            FOREIGN KEY (listing_id) REFERENCES listings(id)
+        );
+        CREATE TABLE IF NOT EXISTS roommates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            listing_id INTEGER NOT NULL,
+            nombre TEXT NOT NULL,
+            edad INTEGER NOT NULL,
+            ocupacion TEXT NOT NULL,
+            estilo_convivencia TEXT NOT NULL,
+            tolerancia_ruido TEXT NOT NULL,
+            horario TEXT NOT NULL,
+            genero TEXT DEFAULT 'no_especificar',
             preferencia_genero TEXT DEFAULT 'sin_preferencia',
+            es_propietario INTEGER DEFAULT 0,
             descripcion TEXT,
             FOREIGN KEY (listing_id) REFERENCES listings(id)
         );
@@ -66,11 +77,21 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL, candidate_id INTEGER NOT NULL,
             listing_id INTEGER NOT NULL,
+            score_mean REAL, score_min REAL, score_weighted REAL,
             score_estilo REAL, score_ruido REAL, score_horario REAL,
             score_duracion REAL, score_edad REAL, score_ocupacion REAL,
             score_genero REAL, valor INTEGER NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(user_id, listing_id)
+        );
+        CREATE TABLE IF NOT EXISTS ml_weights (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            alpha_mean REAL DEFAULT 0.33,
+            alpha_min REAL DEFAULT 0.33,
+            alpha_weighted REAL DEFAULT 0.34,
+            trained_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            sample_count INTEGER DEFAULT 0,
+            accuracy REAL DEFAULT 0.0
         );
     """)
     conn.commit(); conn.close()
@@ -119,10 +140,12 @@ def save_feedback(user_id, candidate_id, listing_id, scores, valor):
     try:
         conn.execute("""
             INSERT OR REPLACE INTO feedback
-            (user_id,candidate_id,listing_id,score_estilo,score_ruido,score_horario,
-             score_duracion,score_edad,score_ocupacion,score_genero,valor)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+            (user_id,candidate_id,listing_id,score_mean,score_min,score_weighted,
+             score_estilo,score_ruido,score_horario,score_duracion,score_edad,
+             score_ocupacion,score_genero,valor)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (user_id, candidate_id, listing_id,
+              scores.get("mean",0), scores.get("min",0), scores.get("weighted",0),
               scores.get("estilo_convivencia",0), scores.get("tolerancia_ruido",0),
               scores.get("horario",0), scores.get("duracion",0),
               scores.get("edad",0), scores.get("ocupacion",0),
@@ -139,6 +162,24 @@ def get_feedback_count():
     conn = get_connection()
     n = conn.execute("SELECT COUNT(*) FROM feedback").fetchone()[0]
     conn.close(); return n
+
+def get_ml_weights():
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM ml_weights ORDER BY id DESC LIMIT 1").fetchone()
+    conn.close()
+    if row:
+        return {"alpha_mean": row["alpha_mean"], "alpha_min": row["alpha_min"],
+                "alpha_weighted": row["alpha_weighted"],
+                "sample_count": row["sample_count"], "accuracy": row["accuracy"]}
+    return {"alpha_mean": 0.33, "alpha_min": 0.33, "alpha_weighted": 0.34,
+            "sample_count": 0, "accuracy": 0.0}
+
+def save_ml_weights(alpha_mean, alpha_min, alpha_weighted, sample_count, accuracy):
+    conn = get_connection()
+    conn.execute("""INSERT INTO ml_weights (alpha_mean,alpha_min,alpha_weighted,sample_count,accuracy)
+                    VALUES (?,?,?,?,?)""",
+                 (alpha_mean, alpha_min, alpha_weighted, sample_count, accuracy))
+    conn.commit(); conn.close()
 
 # ── CANDIDATES ──
 def insert_candidate(c):
@@ -175,6 +216,7 @@ def _row_to_candidate(r):
         tolerancia_ruido=ToleranciaRuido(r["tolerancia_ruido"]),
         horario=Horario(r["horario"]),
         acepta_mascotas=bool(r["acepta_mascotas"]), fumador=bool(r["fumador"]),
+        genero=Genero(r["genero"] or "no_especificar"),
         preferencia_genero=PreferenciaGenero(r["preferencia_genero"] or "sin_preferencia"),
         descripcion=r["descripcion"],
     )
@@ -218,12 +260,10 @@ def insert_household(h):
     d = h.to_dict()
     cur = conn.execute("""
         INSERT INTO households
-        (listing_id,estilo_convivencia,tolerancia_ruido,horario_predominante,
-         perfil_buscado_ocupacion,perfil_buscado_edad_min,perfil_buscado_edad_max,
-         duracion_preferida,num_convivientes_actuales,preferencia_genero,descripcion)
-        VALUES (:listing_id,:estilo_convivencia,:tolerancia_ruido,:horario_predominante,
-                :perfil_buscado_ocupacion,:perfil_buscado_edad_min,:perfil_buscado_edad_max,
-                :duracion_preferida,:num_convivientes_actuales,:preferencia_genero,:descripcion)
+        (listing_id,duracion_preferida,perfil_buscado_edad_min,
+         perfil_buscado_edad_max,perfil_buscado_ocupacion,descripcion)
+        VALUES (:listing_id,:duracion_preferida,:perfil_buscado_edad_min,
+                :perfil_buscado_edad_max,:perfil_buscado_ocupacion,:descripcion)
     """, d)
     conn.commit(); new_id = cur.lastrowid; conn.close(); return new_id
 
@@ -231,11 +271,6 @@ def get_all_households():
     conn = get_connection()
     rows = conn.execute("SELECT * FROM households").fetchall()
     conn.close(); return [_row_to_household(r) for r in rows]
-
-def get_household(hid):
-    conn = get_connection()
-    row = conn.execute("SELECT * FROM households WHERE id=?", (hid,)).fetchone()
-    conn.close(); return _row_to_household(row) if row else None
 
 def get_household_by_listing(lid):
     conn = get_connection()
@@ -246,14 +281,46 @@ def _row_to_household(r):
     ocu = r["perfil_buscado_ocupacion"]
     return Household(
         id=r["id"], listing_id=r["listing_id"],
-        estilo_convivencia=EstiloConvivencia(r["estilo_convivencia"]),
-        tolerancia_ruido=ToleranciaRuido(r["tolerancia_ruido"]),
-        horario_predominante=Horario(r["horario_predominante"]),
-        perfil_buscado_ocupacion=Ocupacion(ocu) if ocu else None,
+        duracion_preferida=Duracion(r["duracion_preferida"]),
         perfil_buscado_edad_min=r["perfil_buscado_edad_min"],
         perfil_buscado_edad_max=r["perfil_buscado_edad_max"],
-        duracion_preferida=Duracion(r["duracion_preferida"]),
-        num_convivientes_actuales=r["num_convivientes_actuales"],
+        perfil_buscado_ocupacion=Ocupacion(ocu) if ocu else None,
+        descripcion=r["descripcion"],
+    )
+
+# ── ROOMMATES ──
+def insert_roommate(rm):
+    conn = get_connection()
+    d = rm.to_dict()
+    cur = conn.execute("""
+        INSERT INTO roommates
+        (listing_id,nombre,edad,ocupacion,estilo_convivencia,tolerancia_ruido,
+         horario,genero,preferencia_genero,es_propietario,descripcion)
+        VALUES (:listing_id,:nombre,:edad,:ocupacion,:estilo_convivencia,:tolerancia_ruido,
+                :horario,:genero,:preferencia_genero,:es_propietario,:descripcion)
+    """, d)
+    conn.commit(); new_id = cur.lastrowid; conn.close(); return new_id
+
+def get_roommates_by_listing(lid):
+    conn = get_connection()
+    rows = conn.execute("SELECT * FROM roommates WHERE listing_id=?", (lid,)).fetchall()
+    conn.close(); return [_row_to_roommate(r) for r in rows]
+
+def get_all_roommates():
+    conn = get_connection()
+    rows = conn.execute("SELECT * FROM roommates").fetchall()
+    conn.close(); return [_row_to_roommate(r) for r in rows]
+
+def _row_to_roommate(r):
+    return Roommate(
+        id=r["id"], listing_id=r["listing_id"],
+        nombre=r["nombre"], edad=r["edad"],
+        ocupacion=Ocupacion(r["ocupacion"]),
+        estilo_convivencia=EstiloConvivencia(r["estilo_convivencia"]),
+        tolerancia_ruido=ToleranciaRuido(r["tolerancia_ruido"]),
+        horario=Horario(r["horario"]),
+        genero=Genero(r["genero"] or "no_especificar"),
         preferencia_genero=PreferenciaGenero(r["preferencia_genero"] or "sin_preferencia"),
+        es_propietario=bool(r["es_propietario"]),
         descripcion=r["descripcion"],
     )
