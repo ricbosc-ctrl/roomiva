@@ -17,7 +17,7 @@ from models.models import (
 from database.db import (
     init_db, get_user_by_email, get_user, create_user,
     update_user_candidate, update_user_listing, verify_password,
-    insert_candidate, get_all_candidates, get_candidate,
+    insert_candidate, get_all_candidates, get_candidate, update_candidate,
     insert_listing, get_all_listings, get_listing,
     insert_household, get_all_households, get_household_by_listing,
     get_all_roommates, get_roommates_by_listing,
@@ -107,6 +107,13 @@ def create_candidate_profile(data: CandidateProfileIn, uid: int = Depends(get_ui
         estilo_convivencia=data.estilo_convivencia, tolerancia_ruido=data.tolerancia_ruido,
         horario=data.horario, acepta_mascotas=data.acepta_mascotas, fumador=data.fumador,
         genero=data.genero, preferencia_genero=data.preferencia_genero, descripcion=data.descripcion)
+
+    # Si ya tiene perfil, actualiza en lugar de crear uno nuevo
+    if user.candidate_id:
+        c.id = user.candidate_id
+        update_candidate(user.candidate_id, c)
+        return {"candidate_id": user.candidate_id, "duracion_categoria": duracion.value}
+
     cid = insert_candidate(c)
     update_user_candidate(uid, cid)
     return {"candidate_id": cid, "duracion_categoria": duracion.value}

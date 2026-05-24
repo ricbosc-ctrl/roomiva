@@ -196,6 +196,20 @@ def insert_candidate(c):
     """, d)
     conn.commit(); new_id = cur.lastrowid; conn.close(); return new_id
 
+def update_candidate(cid: int, c):
+    conn = get_connection()
+    d = c.to_dict()
+    d["id"] = cid
+    conn.execute(
+        "UPDATE candidates SET edad=:edad, ocupacion=:ocupacion, presupuesto_max=:presupuesto_max,"
+        " barrios_preferidos=:barrios_preferidos, meses_estancia=:meses_estancia,"
+        " duracion_deseada=:duracion_deseada, estilo_convivencia=:estilo_convivencia,"
+        " tolerancia_ruido=:tolerancia_ruido, horario=:horario,"
+        " acepta_mascotas=:acepta_mascotas, fumador=:fumador,"
+        " genero=:genero, preferencia_genero=:preferencia_genero, descripcion=:descripcion"
+        " WHERE id=:id", d)
+    conn.commit(); conn.close()
+
 def get_all_candidates():
     conn = get_connection()
     rows = conn.execute("SELECT * FROM candidates").fetchall()
