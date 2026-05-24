@@ -1152,7 +1152,6 @@ async function saveSettings() {
   const {ok, data} = await post('/profile/candidate', body, S.token);
   if(!ok) return showAlert('alert-settings', data.detail || 'Error al guardar');
   S.cid = data.candidate_id;
-  update_user_candidate(S.uid, S.cid);
 
   // Reload dashboard with new recommendations
   await loadCandidateDash();
