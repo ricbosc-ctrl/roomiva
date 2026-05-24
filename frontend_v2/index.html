@@ -324,21 +324,34 @@ nav {
 .info-pill-amber { background: #FEF3C7; border-color: #FDE68A; color: #92400E; }
 .rc-desc { font-size: 0.8rem; color: var(--text-2); line-height: 1.5; margin: 6px 0; font-style: italic; }
 .rc-feedback { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
-.feedback-btn { padding: 5px 14px; border-radius: 6px; font-size: 0.78rem; font-weight: 500; cursor: pointer; font-family: inherit; border: 1.5px solid; transition: all 0.15s; }
+.feedback-btn { padding: 7px 18px; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer; font-family: inherit; border: 2px solid; transition: all 0.2s; letter-spacing: 0.01em; }
 .feedback-yes { border-color: #16A34A; color: #16A34A; background: white; }
-.feedback-yes:hover, .feedback-yes.active { background: #DCFCE7; }
+.feedback-yes:hover { background: #DCFCE7; transform: translateY(-1px); }
+.feedback-yes.active { background: #16A34A; color: white; border-color: #16A34A; box-shadow: 0 2px 8px rgba(22,163,74,0.3); transform: translateY(-1px); }
 .feedback-no { border-color: var(--border-2); color: var(--text-2); background: white; }
-.feedback-no:hover, .feedback-no.active { background: var(--surface-2); }
-.feedback-btn.sent { opacity: 0.6; cursor: default; }
+.feedback-no:hover { background: #FEF2F2; border-color: #DC2626; color: #DC2626; transform: translateY(-1px); }
+.feedback-no.active { background: #DC2626; color: white; border-color: #DC2626; box-shadow: 0 2px 8px rgba(220,38,38,0.3); transform: translateY(-1px); }
+.feedback-btn.sent { cursor: default; }
+.feedback-btn.sent:not(.active) { opacity: 0.35; transform: none !important; }
+.feedback-label-sent { font-size: 0.75rem; color: var(--text-3); font-style: italic; }
 .rm-section { margin-bottom: 4px; }
-.rm-section-label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); margin-bottom: 10px; }
-.rm-item { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.rm-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: white; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.rm-info { flex: 1; }
-.rm-name { font-size: 0.78rem; font-weight: 500; margin-bottom: 3px; color: var(--text); }
-.rm-bar-track { height: 4px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
-.rm-bar-fill { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
-.rm-pct { font-size: 0.78rem; font-weight: 600; flex-shrink: 0; min-width: 36px; text-align: right; }
+.rm-section-label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); margin-bottom: 12px; }
+.rm-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 8px; }
+.rm-item-top { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.rm-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: white; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.rm-header { flex: 1; }
+.rm-name { font-size: 0.85rem; font-weight: 600; color: var(--text); }
+.rm-subtitle { font-size: 0.75rem; color: var(--text-2); margin-top: 1px; }
+.rm-score-badge { flex-shrink: 0; padding: 3px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; }
+.rm-high-bg { background: #DCFCE7; color: #16A34A; }
+.rm-mid-bg  { background: #FEF3C7; color: #D97706; }
+.rm-low-bg  { background: #FEE2E2; color: #DC2626; }
+.rm-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.rm-chip { padding: 3px 9px; border-radius: 4px; font-size: 0.72rem; font-weight: 500; background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border); }
+.rm-chip-match { background: #DCFCE7; color: #16A34A; border-color: #BBF7D0; }
+.rm-chip-warn  { background: #FEF3C7; color: #D97706; border-color: #FDE68A; }
+.rm-chip-bad   { background: #FEE2E2; color: #DC2626; border-color: #FECACA; }
+.rm-desc { font-size: 0.75rem; color: var(--text-2); margin-top: 8px; line-height: 1.5; font-style: italic; padding-top: 8px; border-top: 1px solid var(--border); }
 .rm-high { background: #16A34A; color: #16A34A; }
 .rm-mid  { background: #D97706; color: #D97706; }
 .rm-low  { background: #DC2626; color: #DC2626; }
@@ -967,8 +980,12 @@ async function sendFeedback(idx, valor) {
   const {ok} = await post('/feedback', {listing_id: r.target_id, scores, valor}, S.token);
   if(ok && fbDiv) {
     fbDiv.dataset.sent = '1';
-    fbDiv.querySelectorAll('.feedback-btn').forEach(b => b.classList.add('sent'));
-    fbDiv.querySelectorAll('.feedback-btn')[valor === 1 ? 0 : 1].classList.add('active');
+    const yesBtn = document.getElementById('fb-yes-'+idx);
+    const noBtn = document.getElementById('fb-no-'+idx);
+    if(yesBtn) { yesBtn.classList.add('sent'); if(valor===1) yesBtn.classList.add('active'); }
+    if(noBtn)  { noBtn.classList.add('sent');  if(valor===0) noBtn.classList.add('active'); }
+    const label = fbDiv.querySelector('span');
+    if(label) label.textContent = valor===1 ? '✓ Marcado como interesante' : '✗ Descartado';
   }
 }
 
@@ -1114,17 +1131,38 @@ function resultCard(r, i) {
       <div class="rc-bar-track"><div class="rc-bar-fill" style="width:${Math.round(v*100)}%;background:${BAR_COLORS[k]||'#1A3A2A'}"></div></div>
     </div>`).join('');
 
-  // Roommate scores breakdown
+  // Roommate scores breakdown — rich cards with key data
   const rmScores = (r.roommate_scores||[]).map(rs => {
-    const rsc = rs.score_pct>=70?'rm-high':rs.score_pct>=45?'rm-mid':'rm-low';
-    return `<div class="rm-item">
-      <div class="rm-avatar">${rs.roommate_nombre.charAt(0)}</div>
-      <div class="rm-info">
-        <div class="rm-name">${rs.roommate_nombre}</div>
-        <div class="rm-bar-track"><div class="rm-bar-fill ${rsc}" style="width:${rs.score_pct}%"></div></div>
+    const bgClass = rs.score_pct>=70?'rm-high-bg':rs.score_pct>=45?'rm-mid-bg':'rm-low-bg';
+
+    // Generate chips for each criterion
+    const chipLabels = {estilo_convivencia:'Estilo',tolerancia_ruido:'Ruido',horario:'Horario',edad:'Edad',ocupacion:'Ocupación',genero:'Género'};
+    const chips = Object.entries(rs.detalle||{}).map(([k,v]) => {
+      const chipClass = v>=0.65?'rm-chip-match':v>=0.35?'rm-chip-warn':'rm-chip-bad';
+      // Find matching message
+      const allMsgs = [...(rs.razones||[]),...(rs.advertencias||[])];
+      const kmap = {estilo_convivencia:'estilo',tolerancia_ruido:'ruido',horario:'horario',edad:'años',ocupacion:'busca',genero:'género'};
+      const msg = allMsgs.find(m=>m.toLowerCase().includes(kmap[k]||k));
+      const shortMsg = msg ? msg.replace(/^El conviviente /i,'').replace(/^El hogar /i,'') : chipLabels[k];
+      const truncated = shortMsg.length > 38 ? shortMsg.substring(0,36)+'…' : shortMsg;
+      return `<span class="rm-chip ${chipClass}" title="${msg||''}">${truncated}</span>`;
+    }).join('');
+
+    // Subtitle with key facts
+    const det = rs.detalle || {};
+    const estiloScore = det.estilo_convivencia || 0;
+    const ruidoScore = det.tolerancia_ruido || 0;
+
+    return \`<div class="rm-item">
+      <div class="rm-item-top">
+        <div class="rm-avatar">\${rs.roommate_nombre.charAt(0)}</div>
+        <div class="rm-header">
+          <div class="rm-name">\${rs.roommate_nombre}</div>
+        </div>
+        <span class="rm-score-badge \${bgClass}">\${rs.score_pct}% match</span>
       </div>
-      <div class="rm-pct ${rsc}">${rs.score_pct}%</div>
-    </div>`;
+      <div class="rm-chips">\${chips}</div>
+    </div>\`;
   }).join('');
   const allTags = Object.entries(r.score_detalle||{}).map(([k,v]) => {
     const label = BAR_LABELS[k]||k;
@@ -1173,10 +1211,10 @@ function resultCard(r, i) {
         ${rmScores}
       </div>` : ''}
       <div class="rc-tags" style="margin-bottom:12px;margin-top:${rmScores?'12px':'0'}">${allTags}</div>
-      <div class="rc-feedback" id="fb-${i}">
-        <span style="font-size:0.75rem;color:var(--text-3);margin-right:8px">¿Te interesa?</span>
-        <button class="feedback-btn feedback-yes" onclick="sendFeedback(${i}, 1)">Me interesa</button>
-        <button class="feedback-btn feedback-no" onclick="sendFeedback(${i}, 0)">No encaja</button>
+      <div class="rc-feedback" id="fb-${i}" style="display:flex;align-items:center;gap:10px;padding-top:4px">
+        <span style="font-size:0.78rem;color:var(--text-2);font-weight:500">¿Te interesa este hogar?</span>
+        <button class="feedback-btn feedback-yes" id="fb-yes-${i}" onclick="sendFeedback(${i}, 1)">Sí, me interesa</button>
+        <button class="feedback-btn feedback-no" id="fb-no-${i}" onclick="sendFeedback(${i}, 0)">No encaja</button>
       </div>
     </div>
   </div>`;
