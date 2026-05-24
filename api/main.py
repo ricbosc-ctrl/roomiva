@@ -21,7 +21,7 @@ from database.db import (
     insert_listing, get_all_listings, get_listing,
     insert_household, get_all_households, get_household_by_listing,
     get_all_roommates, get_roommates_by_listing,
-    save_feedback, get_feedback_count, get_ml_weights
+    save_feedback, get_feedback_count, get_ml_weights, get_all_feedback
 )
 from engine.recommender import recommend_listings_for_candidate, DEFAULT_ALPHA
 
@@ -199,3 +199,125 @@ def health():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True)
+
+
+# ── ADMIN ──
+@app.get("/admin/stats", tags=["Admin"], response_class=HTMLResponse)
+def admin_stats():
+    candidates = get_all_candidates()
+    feedbacks = get_all_feedback()
+    listings = get_all_listings()
+    roommates = get_all_roommates()
+    ml = get_ml_weights()
+
+    total_likes    = sum(1 for f in feedbacks if f['valor'] == 1)
+    total_dislikes = sum(1 for f in feedbacks if f['valor'] == 0)
+
+    def cand_row(c):
+        return (f"<tr><td>{c.id}</td><td>{c.nombre}</td><td>{c.edad}</td>"
+                f"<td>{c.ocupacion.value}</td><td>{c.presupuesto_max}€</td>"
+                f"<td>{', '.join(c.barrios_preferidos)}</td>"
+                f"<td>{c.meses_estancia}m · {c.duracion_deseada.value}</td>"
+                f"<td>{c.estilo_convivencia.value}</td><td>{c.tolerancia_ruido.value}</td>"
+                f"<td>{c.horario.value}</td><td>{c.genero.value}</td></tr>")
+
+    def fb_row(f):
+        color = "#16A34A" if f['valor'] == 1 else "#DC2626"
+        label = "Me interesa" if f['valor'] == 1 else "No encaja"
+        sm = f"{round(f['score_mean']*100)}%" if f['score_mean'] is not None else "-"
+        si = f"{round(f['score_min']*100)}%" if f['score_min'] is not None else "-"
+        return (f"<tr><td>{f['id']}</td><td>{f['user_id']}</td>"
+                f"<td>{f['candidate_id']}</td><td>{f['listing_id']}</td>"
+                f"<td style='color:{color};font-weight:600'>{label}</td>"
+                f"<td>{sm}</td><td>{si}</td>"
+                f"<td>{str(f['created_at'])[:16]}</td></tr>")
+
+    cand_rows = "".join(cand_row(c) for c in candidates)
+    fb_rows   = "".join(fb_row(f) for f in feedbacks)
+    ml_status = f"Activo ({ml['sample_count']} muestras)" if ml['sample_count'] >= 10 else "Inactivo — necesita 10+ feedbacks"
+    ml_color  = "#16A34A" if ml['sample_count'] >= 10 else "#D97706"
+
+    html = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Roomiva Admin</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{font-family:Arial,sans-serif;background:#F7F5F0;color:#111;padding:40px}}
+h1{{font-size:1.8rem;color:#1A3A2A;margin-bottom:4px}}
+h2{{font-size:1rem;font-weight:600;color:#2D6147;margin:32px 0 12px;padding-bottom:8px;border-bottom:2px solid #E8E6E0}}
+.grid{{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:24px 0}}
+.card{{background:white;border:1px solid #E8E6E0;border-radius:10px;padding:20px;text-align:center}}
+.n{{font-size:2rem;font-weight:700;color:#1A3A2A}}
+.l{{font-size:0.8rem;color:#6B6A65;margin-top:4px}}
+table{{width:100%;border-collapse:collapse;background:white;border-radius:10px;overflow:hidden;border:1px solid #E8E6E0;font-size:0.8rem;margin-bottom:8px}}
+th{{background:#1A3A2A;color:white;padding:9px 12px;text-align:left;font-weight:500}}
+td{{padding:8px 12px;border-bottom:1px solid #F0EDE8}}
+tr:last-child td{{border-bottom:none}}
+tr:hover td{{background:#F7F5F0}}
+.btn{{display:inline-block;padding:7px 16px;background:#1A3A2A;color:white;border-radius:6px;text-decoration:none;font-size:0.8rem;margin-right:8px}}
+.ml{{background:white;border:1px solid #E8E6E0;border-radius:10px;padding:20px;margin:8px 0 16px}}
+.ml-r{{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F0EDE8;font-size:0.85rem}}
+.ml-r:last-child{{border-bottom:none}}
+</style>
+</head>
+<body>
+<h1>Roomiva — Panel de Administración</h1>
+<p style="color:#6B6A65;margin-top:4px">{len(candidates)} candidatos · {len(feedbacks)} feedbacks · {len(listings)} pisos · {len(roommates)} convivientes</p>
+
+<div class="grid">
+  <div class="card"><div class="n">{len(candidates)}</div><div class="l">Candidatos</div></div>
+  <div class="card"><div class="n">{len(feedbacks)}</div><div class="l">Feedbacks</div></div>
+  <div class="card"><div class="n" style="color:#16A34A">{total_likes}</div><div class="l">Me interesa</div></div>
+  <div class="card"><div class="n" style="color:#DC2626">{total_dislikes}</div><div class="l">No encaja</div></div>
+</div>
+
+<h2>Modelo ML</h2>
+<div class="ml">
+  <div class="ml-r"><span>Estado</span><span style="color:{ml_color};font-weight:600">{ml_status}</span></div>
+  <div class="ml-r"><span>Alpha media (todos pesan igual)</span><span style="font-weight:600">{round(ml['alpha_mean']*100)}%</span></div>
+  <div class="ml-r"><span>Alpha mínimo (el más difícil marca el score)</span><span style="font-weight:600">{round(ml['alpha_min']*100)}%</span></div>
+  <div class="ml-r"><span>Alpha ponderado</span><span style="font-weight:600">{round(ml['alpha_weighted']*100)}%</span></div>
+  <div class="ml-r"><span>Precisión del modelo</span><span style="font-weight:600">{round(ml['accuracy']*100)}%</span></div>
+</div>
+<a class="btn" href="/admin/candidates.csv">Descargar candidatos CSV</a>
+<a class="btn" href="/admin/feedback.csv">Descargar feedback CSV</a>
+
+<h2>Candidatos registrados ({len(candidates)})</h2>
+<table>
+<thead><tr><th>ID</th><th>Nombre</th><th>Edad</th><th>Ocupación</th><th>Presupuesto</th><th>Barrios</th><th>Estancia</th><th>Estilo</th><th>Ruido</th><th>Horario</th><th>Género</th></tr></thead>
+<tbody>{cand_rows if cand_rows else '<tr><td colspan="11" style="text-align:center;color:#6B6A65;padding:20px">Sin candidatos todavía</td></tr>'}</tbody>
+</table>
+
+<h2>Feedbacks ({len(feedbacks)})</h2>
+<table>
+<thead><tr><th>ID</th><th>Usuario</th><th>Candidato</th><th>Piso</th><th>Valoración</th><th>Score medio</th><th>Score mínimo</th><th>Fecha</th></tr></thead>
+<tbody>{fb_rows if fb_rows else '<tr><td colspan="8" style="text-align:center;color:#6B6A65;padding:20px">Sin feedbacks todavía</td></tr>'}</tbody>
+</table>
+</body>
+</html>"""
+    return HTMLResponse(content=html)
+
+
+@app.get("/admin/candidates.csv", tags=["Admin"])
+def export_candidates_csv():
+    from fastapi.responses import Response
+    candidates = get_all_candidates()
+    lines = ["id,nombre,edad,ocupacion,presupuesto_max,barrios,meses_estancia,estilo,ruido,horario,genero,fumador,mascotas"]
+    for c in candidates:
+        barrios = "|".join(c.barrios_preferidos)
+        lines.append(f'{c.id},{c.nombre},{c.edad},{c.ocupacion.value},{c.presupuesto_max},{barrios},{c.meses_estancia},{c.estilo_convivencia.value},{c.tolerancia_ruido.value},{c.horario.value},{c.genero.value},{int(c.fumador)},{int(c.acepta_mascotas)}')
+    return Response(content="\n".join(lines), media_type="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=candidatos.csv"})
+
+
+@app.get("/admin/feedback.csv", tags=["Admin"])
+def export_feedback_csv():
+    from fastapi.responses import Response
+    feedbacks = get_all_feedback()
+    lines = ["id,user_id,candidate_id,listing_id,valor,score_mean,score_min,score_weighted,created_at"]
+    for f in feedbacks:
+        lines.append(f'{f["id"]},{f["user_id"]},{f["candidate_id"]},{f["listing_id"]},{f["valor"]},{f["score_mean"]},{f["score_min"]},{f["score_weighted"]},{f["created_at"]}')
+    return Response(content="\n".join(lines), media_type="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=feedback.csv"})
