@@ -1076,7 +1076,14 @@ function renderListingProfile(d) {
 // ── SETTINGS ──
 function renderCandidateSettings() {
   const d = cachedCandidate || {};
+  const currentBarrios = d.barrios_preferidos ? d.barrios_preferidos.split(',') : [];
+  const barriosGrid = BARRIOS.map(b => {
+    const sel = currentBarrios.includes(b) ? 'selected' : '';
+    return `<button class="barrio-chip ${sel}" data-b="${b}" onclick="this.classList.toggle('selected')">${b}</button>`;
+  }).join('');
+
   document.getElementById('dc-settings').innerHTML = `
+    <div id="alert-settings"></div>
     <div class="settings-section">
       <div class="settings-section-header"><h3>Datos personales</h3></div>
       <div class="settings-row"><div class="settings-row-info"><div class="settings-row-label">Edad</div></div><div class="settings-row-control"><input type="number" id="s-edad" value="${d.edad||''}"></div></div>
@@ -1086,6 +1093,10 @@ function renderCandidateSettings() {
       <div class="settings-section-header"><h3>Búsqueda</h3></div>
       <div class="settings-row"><div class="settings-row-info"><div class="settings-row-label">Presupuesto máximo</div><div class="settings-row-sub">€ por mes</div></div><div class="settings-row-control"><input type="number" id="s-presup" value="${d.presupuesto_max||''}"></div></div>
       <div class="settings-row"><div class="settings-row-info"><div class="settings-row-label">Meses de estancia</div></div><div class="settings-row-control"><input type="number" id="s-meses" value="${d.meses_estancia||''}" min="3"></div></div>
+      <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:10px">
+        <div class="settings-row-info"><div class="settings-row-label">Barrios preferidos</div></div>
+        <div class="barrios-grid" id="barrios-settings" style="width:100%">${barriosGrid}</div>
+      </div>
     </div>
     <div class="settings-section">
       <div class="settings-section-header"><h3>Convivencia</h3></div>
@@ -1094,8 +1105,8 @@ function renderCandidateSettings() {
       <div class="settings-row"><div class="settings-row-info"><div class="settings-row-label">Horario</div></div><div class="settings-row-control"><select id="s-horario"><option value="diurno" ${d.horario==='diurno'?'selected':''}>Diurno</option><option value="nocturno" ${d.horario==='nocturno'?'selected':''}>Nocturno</option><option value="flexible" ${d.horario==='flexible'?'selected':''}>Flexible</option></select></div></div>
     </div>
     <div class="settings-save-bar">
-      <button class="btn btn-outline" onclick="showDashPanel('c','recomendaciones');document.querySelectorAll('#page-dash-candidato .dash-tab')[0].classList.add('active');document.querySelectorAll('#page-dash-candidato .dash-tab')[1].classList.remove('active')">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveSettings()">Guardar cambios</button>
+      <button class="btn btn-outline" onclick="showDashPanelDirect('c','recomendaciones')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveSettings()">Guardar y recalcular</button>
     </div>`;
 }
 
@@ -1115,7 +1126,46 @@ function renderPropietarioSettings() {
 }
 
 async function saveSettings() {
-  alert('Cambios guardados. Recarga las recomendaciones para ver los resultados actualizados.');
+  const edad = document.getElementById('s-edad')?.value;
+  const presup = document.getElementById('s-presup')?.value;
+  const meses = document.getElementById('s-meses')?.value;
+  const estilo = document.getElementById('s-estilo')?.value;
+  const ruido = document.getElementById('s-ruido')?.value;
+  const horario = document.getElementById('s-horario')?.value;
+  const ocup = document.getElementById('s-ocup')?.value;
+
+  if(!edad || !presup || !meses) return showAlert('alert-settings','Rellena todos los campos');
+  if(parseInt(meses) < 3) return showAlert('alert-settings','Mínimo 3 meses');
+
+  const body = {
+    edad: parseInt(edad), ocupacion: ocup,
+    presupuesto_max: parseFloat(presup), meses_estancia: parseInt(meses),
+    barrios_preferidos: [...document.querySelectorAll('#barrios-settings .barrio-chip.selected')].map(el=>el.dataset.b),
+    estilo_convivencia: estilo, tolerancia_ruido: ruido, horario,
+    acepta_mascotas: S._mascotas ?? false, fumador: S._fumador ?? false,
+    genero: S._genero ?? 'no_especificar',
+    preferencia_genero: S._pgenero ?? 'sin_preferencia'
+  };
+
+  if(!body.barrios_preferidos.length) return showAlert('alert-settings','Selecciona al menos un barrio');
+
+  const {ok, data} = await post('/profile/candidate', body, S.token);
+  if(!ok) return showAlert('alert-settings', data.detail || 'Error al guardar');
+  S.cid = data.candidate_id;
+  update_user_candidate(S.uid, S.cid);
+
+  // Reload dashboard with new recommendations
+  await loadCandidateDash();
+  showDashPanelDirect('c', 'recomendaciones');
+}
+
+function showDashPanelDirect(dash, panel) {
+  const prefix = `dp-${dash}-`;
+  document.querySelectorAll(`[id^="${prefix}"]`).forEach(p => p.classList.remove('active'));
+  document.getElementById(`${prefix}${panel}`).classList.add('active');
+  const tabs = document.querySelectorAll(`#page-dash-${dash==='c'?'candidato':'propietario'} .dash-tab`);
+  tabs.forEach(t => t.classList.remove('active'));
+  tabs[0].classList.add('active');
 }
 
 // ── RESULT CARDS ──

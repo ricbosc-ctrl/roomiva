@@ -49,6 +49,15 @@ LISTINGS_RAW = [
     ("Piso de lujo en Sarrià-Sant Gervasi",      "Sarrià-Sant Gervasi",      900, 2, 1, 24, True,  False, "Zona alta de Barcelona. Jardín, garaje. Perfil ejecutivo."),
     ("Hab. premium Eixample con terraza",        "Eixample",                 920, 3, 1, 18, False, False, "Terraza privada en el Eixample. Alto standing."),
     ("Hab. en Sarrià top",                       "Sarrià-Sant Gervasi",      950, 2, 1, 24, True,  False, "Jardín, terraza, zona exclusiva. Todo incluido."),
+    # ── PISOS ECONÓMICOS CON FUMAR PERMITIDO ──
+    ("Hab. muy asequible en Nou Barris",          "Nou Barris",               290, 5, 3, 3,  False, True,  "Piso grande y económico. Ambiente relajado, se puede fumar en casa."),
+    ("Hab. barata en Horta-Guinardó",             "Horta-Guinardó",           300, 4, 2, 3,  False, True,  "Piso tranquilo en zona residencial. Fumadores bienvenidos."),
+    ("Hab. económica Sant Andreu fumadores",      "Sant Andreu",              310, 4, 2, 4,  False, True,  "Piso amplio. Se permite fumar. Compañeros tranquilos y respetuosos."),
+    ("Hab. low cost en Sants fumadores",          "Sants-Montjuïc",           320, 5, 3, 3,  False, True,  "Muy bien comunicado. Ambiente social. Se puede fumar."),
+    ("Hab. económica en Clot fumadores",          "Clot",                     330, 4, 2, 3,  False, True,  "Piso joven. Zona bien comunicada. Fumadores bienvenidos."),
+    ("Hab. asequible en Nou Barris sur",          "Nou Barris",               340, 4, 2, 4,  False, True,  "Piso reformado. Ambiente mixto. Se permite fumar en zonas comunes."),
+    ("Hab. barata en Horta con terraza",          "Horta-Guinardó",           350, 3, 1, 4,  False, True,  "Terraza privada. Zona tranquila. Fumadores permitidos."),
+    ("Hab. económica en Sant Andreu norte",       "Sant Andreu",              350, 4, 2, 3,  False, True,  "Piso luminoso. Ambiente relajado. Se puede fumar."),
 ]
 
 # Convivientes por listing (1-3 por piso)
@@ -119,6 +128,23 @@ ROOMMATES_BY_LISTING = {
     39: [("Joaquim", 58, Ocupacion.OTRO, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA, Horario.DIURNO, Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, True, "Inversor. El mejor piso del dataset. Solo adultos de perfil muy alto.")],
 }
 
+# Roommates for new cheap listings (indices 40-47)
+ROOMMATES_BY_LISTING.update({
+    40: [("Dani",   22, Ocupacion.ESTUDIANTE, EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, True,  "Estudiante, me gusta el ambiente social y relajado. Fumador."),
+         ("Leo",    21, Ocupacion.ESTUDIANTE, EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, False, "Erasmus francés. Busco gente con quien salir y disfrutar Barcelona.")],
+    41: [("Toni",   30, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.MEDIA, Horario.DIURNO,    Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, True,  "Trabajador tranquilo. Fumador ocasional. Busco ambiente sin dramas.")],
+    42: [("Mireia", 25, Ocupacion.TRABAJADOR, EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  Genero.MUJER,  PreferenciaGenero.SIN_PREFERENCIA, True,  "Trabajadora en hostelería. Fumadora. Horarios variables pero ordenada."),
+         ("Quim",   27, Ocupacion.FREELANCE,  EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, False, "Diseñador freelance. Fumador. Trabajo desde casa algunos días.")],
+    43: [("Ivet",   23, Ocupacion.ESTUDIANTE, EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  Genero.MUJER,  PreferenciaGenero.SIN_PREFERENCIA, True,  "Estudiante de periodismo. Fumadora social. Ambiente muy abierto."),
+         ("Marc",   22, Ocupacion.ESTUDIANTE, EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, False, "Estudiante. Fumador. Me gusta el ambiente animado.")],
+    44: [("Berta",  24, Ocupacion.ESTUDIANTE, EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.FLEXIBLE,  Genero.MUJER,  PreferenciaGenero.SIN_PREFERENCIA, True,  "Estudiante de máster. Fumadora. Busco compañeros jóvenes y sociables.")],
+    45: [("Rafa",   28, Ocupacion.TRABAJADOR, EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, True,  "Trabajador en construcción. Fumador. Tranquilo en casa."),
+         ("Santi",  29, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.MEDIA, Horario.DIURNO,    Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, False, "Operario. Fumador. Vida muy ordenada y tranquila.")],
+    46: [("Nati",   26, Ocupacion.TRABAJADOR, EstiloConvivencia.TRANQUILO, ToleranciaRuido.BAJA,  Horario.DIURNO,    Genero.MUJER,  PreferenciaGenero.SIN_PREFERENCIA, True,  "Auxiliar administrativa. Fumadora. Busco ambiente tranquilo.")],
+    47: [("Jordi",  25, Ocupacion.ESTUDIANTE, EstiloConvivencia.SOCIAL,    ToleranciaRuido.ALTA,  Horario.NOCTURNO,  Genero.HOMBRE, PreferenciaGenero.SIN_PREFERENCIA, True,  "Estudiante universitario. Fumador. Busco gente joven y abierta."),
+         ("Paula",  24, Ocupacion.ESTUDIANTE, EstiloConvivencia.MIXTO,     ToleranciaRuido.MEDIA, Horario.FLEXIBLE,  Genero.MUJER,  PreferenciaGenero.SIN_PREFERENCIA, False, "Estudiante. Fumadora ocasional. Me adapto bien a distintos ambientes.")],
+})
+
 HOUSEHOLDS_RAW = [
     (0,  Duracion.CORTA,  18, 28, Ocupacion.ESTUDIANTE, "Piso universitario. Buscamos estudiante o joven trabajador."),
     (1,  Duracion.CORTA,  22, 40, None,                 "Piso tranquilo. Persona ordenada y respetuosa."),
@@ -160,6 +186,15 @@ HOUSEHOLDS_RAW = [
     (37, Duracion.LARGA,  38, 70, None,                 "Sarrià lujo. Solo perfil senior muy seleccionado."),
     (38, Duracion.LARGA,  30, 52, Ocupacion.TRABAJADOR, "Eixample terraza. Solo larga estancia."),
     (39, Duracion.LARGA,  35, 70, None,                 "Sarrià top exclusivo. Perfil muy alto."),
+    # Nuevos pisos económicos con fumar
+    (40, Duracion.CORTA,  18, 30, Ocupacion.ESTUDIANTE, "Piso económico y social. Fumadores bienvenidos."),
+    (41, Duracion.CORTA,  20, 40, None,                 "Piso tranquilo. Fumadores aceptados."),
+    (42, Duracion.CORTA,  20, 35, None,                 "Ambiente mixto. Fumadores bienvenidos."),
+    (43, Duracion.CORTA,  18, 30, None,                 "Piso social y económico. Se permite fumar."),
+    (44, Duracion.CORTA,  18, 30, Ocupacion.ESTUDIANTE, "Piso de estudiantes. Fumadores OK."),
+    (45, Duracion.MEDIA,  22, 40, Ocupacion.TRABAJADOR, "Piso tranquilo. Trabajadores fumadores bienvenidos."),
+    (46, Duracion.MEDIA,  20, 38, None,                 "Piso con terraza. Fumadores permitidos."),
+    (47, Duracion.CORTA,  18, 30, None,                 "Piso joven y económico. Se puede fumar."),
 ]
 
 CANDIDATES_RAW = [
