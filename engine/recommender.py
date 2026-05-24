@@ -201,7 +201,16 @@ def recommend_listings_for_candidate(
             rm_weights.append(1.0)
             rm_score_objs.append(RoommateScore(
                 roommate_id=rm.id, roommate_nombre=rm.nombre,
-                score=sc, detalle=det, razones=raz, advertencias=adv
+                score=sc, detalle=det, razones=raz, advertencias=adv,
+                roommate_info={
+                    "edad": rm.edad,
+                    "ocupacion": rm.ocupacion.value,
+                    "estilo": rm.estilo_convivencia.value,
+                    "ruido": rm.tolerancia_ruido.value,
+                    "horario": rm.horario.value,
+                    "genero": rm.genero.value,
+                    "descripcion": rm.descripcion or "",
+                }
             ))
 
         # Agregación grupal con pesos ML

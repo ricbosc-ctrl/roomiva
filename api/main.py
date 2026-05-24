@@ -115,6 +115,8 @@ def create_candidate_profile(data: CandidateProfileIn, uid: int = Depends(get_ui
 class RoommateScoreOut(BaseModel):
     roommate_id: int; roommate_nombre: str; score: float; score_pct: int
     razones: List[str]; advertencias: List[str]
+    roommate_info: Optional[dict] = None
+    roommate_info: Optional[dict] = None
 
 class RecommendationOut(BaseModel):
     target_id: int; target_nombre: str; score_total: float; score_pct: int
@@ -137,7 +139,8 @@ def recommend_for_me(top_n: int = 15, uid: int = Depends(get_uid)):
         roommate_scores=[RoommateScoreOut(
             roommate_id=rs.roommate_id, roommate_nombre=rs.roommate_nombre,
             score=rs.score, score_pct=rs.score_pct,
-            razones=rs.razones, advertencias=rs.advertencias)
+            razones=rs.razones, advertencias=rs.advertencias,
+            roommate_info=rs.roommate_info)
             for rs in r.roommate_scores],
         listing_info=r.listing_info) for r in results]
 

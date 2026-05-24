@@ -191,6 +191,7 @@ class RoommateScore:
     detalle: dict
     razones: List[str]
     advertencias: List[str]
+    roommate_info: Optional[dict] = None
 
     @property
     def score_pct(self) -> int:
