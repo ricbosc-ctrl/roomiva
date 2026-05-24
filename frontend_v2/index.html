@@ -1153,16 +1153,16 @@ function resultCard(r, i) {
     const estiloScore = det.estilo_convivencia || 0;
     const ruidoScore = det.tolerancia_ruido || 0;
 
-    return \`<div class="rm-item">
+    return `<div class="rm-item">
       <div class="rm-item-top">
-        <div class="rm-avatar">\${rs.roommate_nombre.charAt(0)}</div>
+        <div class="rm-avatar">${rs.roommate_nombre.charAt(0)}</div>
         <div class="rm-header">
-          <div class="rm-name">\${rs.roommate_nombre}</div>
+          <div class="rm-name">${rs.roommate_nombre}</div>
         </div>
-        <span class="rm-score-badge \${bgClass}">\${rs.score_pct}% match</span>
+        <span class="rm-score-badge ${bgClass}">${rs.score_pct}% match</span>
       </div>
-      <div class="rm-chips">\${chips}</div>
-    </div>\`;
+      <div class="rm-chips">${chips}</div>
+    </div>`;
   }).join('');
   const allTags = Object.entries(r.score_detalle||{}).map(([k,v]) => {
     const label = BAR_LABELS[k]||k;
